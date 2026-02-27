@@ -9,8 +9,9 @@ import AppKit
 struct SettingsView: View {
     @StateObject private var shortcutService = GlobalShortcutService.shared
     @State private var keyCode: UInt16 = 0
-    @State private var modifiers: NSEvent.ModifierFlags = [.command]
-    
+    @State private var modifiers: NSEvent.ModifierFlags = []
+    @State private var hasPermission = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Settings")
@@ -23,13 +24,43 @@ struct SettingsView: View {
                 }
 
                 Section("Shortcuts") {
-                    ShortcutRecorderView(keyCode: $keyCode, modifiers: $modifiers)
-                        .onChange(of: keyCode) {
-                            shortcutService.updateShortcut(keyCode: keyCode, modifiers: modifiers)
+                    LabeledContent("Open CmdRack") {
+                        ShortcutRecorderView(keyCode: $keyCode, modifiers: $modifiers)
+                            .onChange(of: keyCode) {
+                                shortcutService.updateShortcut(keyCode: keyCode, modifiers: modifiers)
+                            }
+                            .onChange(of: modifiers) {
+                                shortcutService.updateShortcut(keyCode: keyCode, modifiers: modifiers)
+                            }
+                    }
+
+                    if !hasPermission {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                    .font(.caption)
+                                Text("Accessibility permission required for global shortcuts.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Button("Grant Accessibility Access") {
+                                shortcutService.requestAccessibilityPermission()
+                                checkPermission()
+                            }
+                            .font(.caption)
                         }
-                        .onChange(of: modifiers) {
-                            shortcutService.updateShortcut(keyCode: keyCode, modifiers: modifiers)
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                            Text("Accessibility access granted.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
+                    }
                 }
 
                 Section("Data") {
@@ -45,7 +76,12 @@ struct SettingsView: View {
         .onAppear {
             keyCode = shortcutService.keyCode
             modifiers = shortcutService.modifiers
+            checkPermission()
         }
+    }
+
+    private func checkPermission() {
+        hasPermission = shortcutService.hasAccessibilityPermission
     }
 }
 

@@ -10,7 +10,9 @@ import AppKit
 
 @main
 struct CmdRackApp: App {
-    private static let menuBarIcon: NSImage = {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    static let menuBarIcon: NSImage = {
         guard let fullSize = NSImage(named: "MenuBarIcon") else { return NSImage() }
         let targetSize: CGFloat = 22
         let newSize = NSSize(width: targetSize, height: targetSize)
@@ -29,19 +31,63 @@ struct CmdRackApp: App {
     }()
 
     var body: some Scene {
-        MenuBarExtra {
-            ContentView()
-        } label: {
-            Image(nsImage: Self.menuBarIcon)
-        }
-        .menuBarExtraStyle(.window)
-
         Window("CmdRack", id: "manage") {
             ManageDashboardView()
         }
         .defaultSize(width: 720, height: 480)
         .windowResizability(.contentSize)
         .commandsRemoved()
+        .defaultLaunchBehavior(.suppressed)
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem!
+    private let popover = NSPopover()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupStatusItem()
+        setupPopover()
+        setupGlobalShortcut()
+    }
+
+    private func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            button.image = CmdRackApp.menuBarIcon
+            button.action = #selector(togglePopover(_:))
+            button.target = self
+        }
+    }
+
+    private func setupPopover() {
+        popover.behavior = .transient
+        popover.contentSize = NSSize(width: 340, height: 260)
+        popover.contentViewController = NSHostingController(rootView: ContentView())
+    }
+
+    private func setupGlobalShortcut() {
+        GlobalShortcutService.shared.register { [weak self] in
+            self?.togglePopover(nil)
+        }
+    }
+
+    @objc private func togglePopover(_ sender: Any?) {
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            showPopover(sender)
+        }
+    }
+
+    private func showPopover(_ sender: Any?) {
+        guard let button = statusItem.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
     }
 }
 
