@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.openWindow) private var openWindow
     @State private var searchText = ""
 
     var body: some View {
@@ -17,6 +18,16 @@ struct ContentView: View {
 
             TextField("Search", text: $searchText)
                 .textFieldStyle(.roundedBorder)
+
+            RecentCommandsView()
+
+            Button {
+                openWindow(id: "manage")
+            } label: {
+                Label("Manage / Settings", systemImage: "gearshape")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
         }
         .padding()
         .frame(width: 340)
@@ -26,3 +37,4 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+

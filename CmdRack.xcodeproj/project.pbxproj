@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EB84C6F52F4C7584006F85E1 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB84C6D72F4C6A6F006F85E1 /* GRDB */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		EBC8F0442F397CC00091540F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB84C6F52F4C7584006F85E1 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = CmdRack;
 			packageProductDependencies = (
+				EB84C6D72F4C6A6F006F85E1 /* GRDB */,
 			);
 			productName = CmdRack;
 			productReference = EBC8F0362F397CBE0091540F /* CmdRack.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = EBC8F02D2F397CBE0091540F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EBC8F0372F397CBE0091540F /* Products */;
 			projectDirPath = "";
@@ -575,6 +584,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EB84C6D72F4C6A6F006F85E1 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EBC8F02E2F397CBE0091540F /* Project object */;
 }

@@ -35,5 +35,13 @@ struct CmdRackApp: App {
             Image(nsImage: Self.menuBarIcon)
         }
         .menuBarExtraStyle(.window)
+
+        Window("CmdRack", id: "manage") {
+            ManageDashboardView()
+        }
+        .defaultSize(width: 720, height: 480)
+        .windowResizability(.contentSize)
+        .commandsRemoved()
     }
 }
+
