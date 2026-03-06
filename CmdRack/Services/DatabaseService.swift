@@ -58,6 +58,19 @@ final class DatabaseService {
             }
         }
 
+        migrator.registerMigration("add_commands_metadata_v1") { db in
+            // Backward-compatible: only add if missing.
+            let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(commands)")
+            let names: [String] = columns.compactMap { $0["name"] }
+
+            guard !names.contains("metadata") else { return }
+
+            try db.alter(table: "commands") { t in
+                // Stored as JSON string (array of entries)
+                t.add(column: "metadata", .text).notNull().defaults(to: "[]")
+            }
+        }
+
         try migrator.migrate(writer)
     }
 }

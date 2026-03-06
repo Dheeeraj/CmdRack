@@ -13,6 +13,7 @@ struct CommandItem: Codable, FetchableRecord, PersistableRecord, TableRecord, Id
     var title: String
     var command: String
     var tags: [String]
+    var metadata: [CommandMetadataEntry]
     var project: String?
     var tool: String?
     var pinned: Bool
@@ -24,6 +25,7 @@ struct CommandItem: Codable, FetchableRecord, PersistableRecord, TableRecord, Id
         title: String,
         command: String,
         tags: [String] = [],
+        metadata: [CommandMetadataEntry] = [],
         project: String? = nil,
         tool: String? = nil,
         pinned: Bool = false,
@@ -34,6 +36,7 @@ struct CommandItem: Codable, FetchableRecord, PersistableRecord, TableRecord, Id
         self.title = title
         self.command = command
         self.tags = tags
+        self.metadata = metadata
         self.project = project
         self.tool = tool
         self.pinned = pinned
@@ -60,6 +63,14 @@ struct CommandItem: Codable, FetchableRecord, PersistableRecord, TableRecord, Id
         } else {
             tags = []
         }
+
+        let metadataString: String? = row["metadata"]
+        if let raw = metadataString, !raw.isEmpty {
+            let data = Data(raw.utf8)
+            metadata = (try? JSONDecoder().decode([CommandMetadataEntry].self, from: data)) ?? []
+        } else {
+            metadata = []
+        }
     }
 
     // MARK: - PersistableRecord (encode to container)
@@ -81,6 +92,15 @@ struct CommandItem: Codable, FetchableRecord, PersistableRecord, TableRecord, Id
             container["tags"] = json
         } else {
             container["tags"] = "[]"
+        }
+
+        if metadata.isEmpty {
+            container["metadata"] = "[]"
+        } else if let data = try? JSONEncoder().encode(metadata),
+                  let json = String(data: data, encoding: .utf8) {
+            container["metadata"] = json
+        } else {
+            container["metadata"] = "[]"
         }
     }
 }

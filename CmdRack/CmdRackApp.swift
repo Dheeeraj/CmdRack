@@ -36,7 +36,7 @@ struct CmdRackApp: App {
         }
         .defaultSize(width: 720, height: 480)
         .windowResizability(.contentSize)
-        .commandsRemoved()
+        .commands { CommandGroup(replacing: .newItem) { } }
         .defaultLaunchBehavior(.suppressed)
     }
 }

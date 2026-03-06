@@ -13,8 +13,6 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("CmdRack")
-                .font(.headline)
 
             TextField("Search", text: $searchText)
                 .textFieldStyle(.roundedBorder)
