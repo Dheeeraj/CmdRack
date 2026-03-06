@@ -26,6 +26,7 @@ struct AddCommandView: View {
     @State private var pinned = false
     @State private var errors: [String] = []
     @State private var isSaving = false
+    @State private var showDeleteConfirm = false
 
     private let repository = CommandRepository()
     private var isEditMode: Bool { commandToEdit != nil }
@@ -132,6 +133,11 @@ struct AddCommandView: View {
                             TagCloudView(tags: tags) { removeTag($0) }
                         }
                     }
+
+                    // Metadata info (edit mode only, collapsible)
+                    if let item = commandToEdit {
+                        metadataSection(item)
+                    }
                 }
                 .padding(16)
             }
@@ -158,7 +164,7 @@ struct AddCommandView: View {
             Divider()
 
             // Footer
-            HStack {
+            HStack(spacing: 10) {
                 Button("Cancel") {
                     if let onDismiss {
                         onDismiss()
@@ -167,6 +173,16 @@ struct AddCommandView: View {
                     }
                 }
                 .keyboardShortcut(.cancelAction)
+
+                if isEditMode {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
 
                 Spacer()
 
@@ -182,6 +198,12 @@ struct AddCommandView: View {
         }
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
+        .alert("Delete Command?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) { deleteCommand() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This action cannot be undone.")
+        }
         .onAppear {
             if let item = commandToEdit {
                 title   = item.title
@@ -284,6 +306,147 @@ struct AddCommandView: View {
             errs.append("Each tag must be \(Limits.tagLen) characters or less")
         }
         return errs
+    }
+
+    // MARK: - Metadata display (macOS Settings style)
+
+    @State private var showInfo = false
+
+    private func metadataSection(_ item: CommandItem) -> some View {
+        VStack(spacing: 0) {
+            // Header row (always visible) — looks like a Settings row
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    showInfo.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Info")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
+                        Text(infoSubtitle(item))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(showInfo ? 90 : 0))
+                }
+                .padding(10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expanded detail
+            if showInfo {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    if let created = item.metadata.first(where: { $0.type == .create }) {
+                        metadataDetailRow("Created", date: formatMetadataDate(created.createdUTC), device: created.device)
+                    } else {
+                        metadataDetailRow("Created", date: formatDate(item.createdAt), device: nil)
+                    }
+
+                    if let lastUpdate = item.metadata.last(where: { $0.type == .update }) {
+                        metadataDetailRow("Last updated", date: formatMetadataDate(lastUpdate.createdUTC), device: lastUpdate.device)
+                    } else if item.updatedAt != item.createdAt {
+                        metadataDetailRow("Last updated", date: formatDate(item.updatedAt), device: nil)
+                    }
+
+                    let edits = item.metadata.filter { $0.type == .update }.count
+                    if edits > 0 {
+                        metadataDetailRow("Total edits", date: "\(edits)", device: nil)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func infoSubtitle(_ item: CommandItem) -> String {
+        let edits = item.metadata.filter { $0.type == .update }.count
+        if let created = item.metadata.first(where: { $0.type == .create }) {
+            let date = formatMetadataDate(created.createdUTC)
+            return edits > 0 ? "Created \(date) · \(edits) edit\(edits == 1 ? "" : "s")" : "Created \(date)"
+        }
+        return "Created \(formatDate(item.createdAt))"
+    }
+
+    private func metadataDetailRow(_ label: String, date: String, device: String?) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(date)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                if let device {
+                    Text(device)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    private static let localDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        f.doesRelativeDateFormatting = true
+        return f
+    }()
+
+    private static let iso8601Parser: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        return f
+    }()
+
+    private func formatMetadataDate(_ utcString: String) -> String {
+        guard let date = Self.iso8601Parser.date(from: utcString) else {
+            return utcString
+        }
+        return Self.localDateFormatter.string(from: date)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        Self.localDateFormatter.string(from: date)
+    }
+
+    // MARK: - Delete
+
+    private func deleteCommand() {
+        guard let item = commandToEdit else { return }
+        do {
+            try repository.delete(id: item.id)
+            onSave?()
+            onDismiss?()
+        } catch {
+            errors = [error.localizedDescription]
+        }
     }
 
     // MARK: - Helpers
