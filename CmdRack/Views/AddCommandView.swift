@@ -315,34 +315,17 @@ struct AddCommandView: View {
     private func metadataSection(_ item: CommandItem) -> some View {
         VStack(spacing: 0) {
             // Header row (always visible) — looks like a Settings row
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showInfo.toggle()
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Info")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
-                        Text(infoSubtitle(item))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+            SettingsStyleRow(
+                title: "Info",
+                subtitle: infoSubtitle(item),
+                chevronRotated: showInfo,
+                showChevron: true,
+                action: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showInfo.toggle()
                     }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(showInfo ? 90 : 0))
                 }
-                .padding(10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+            )
 
             // Expanded detail
             if showInfo {
