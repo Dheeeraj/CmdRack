@@ -7,6 +7,7 @@ import SwiftUI
 
 enum CommandListTab: String, CaseIterable {
     case all = "All"
+    case pinned = "Pinned"
     case project = "Project"
     case tool = "Tool"
     case tags = "Tags"
@@ -30,6 +31,8 @@ struct CommandListView: View {
         switch selectedTab {
         case .all:
             return commands
+        case .pinned:
+            return commands.filter { $0.pinned }
         case .project:
             return commands.filter { ($0.project ?? "").trimmingCharacters(in: .whitespaces) != "" }
         case .tool:
@@ -62,6 +65,7 @@ struct CommandListView: View {
     private var tabEmptyTitle: String {
         switch selectedTab {
         case .all: return "No commands"
+        case .pinned: return "No pinned commands"
         case .project: return "No commands with a project"
         case .tool: return "No commands with a tool"
         case .tags: return selectedTag == nil ? "No commands with tags" : "No commands with this tag"
@@ -71,6 +75,7 @@ struct CommandListView: View {
     private var tabEmptyIcon: String {
         switch selectedTab {
         case .all: return "terminal"
+        case .pinned: return "pin"
         case .project: return "folder"
         case .tool: return "wrench"
         case .tags: return "tag"
@@ -80,6 +85,7 @@ struct CommandListView: View {
     private var tabEmptyMessage: String {
         switch selectedTab {
         case .all: return "Use the + button to add a command."
+        case .pinned: return "Pin a command to see it here."
         case .project: return "Add a project name to commands to see them here."
         case .tool: return "Add a tool to commands to see them here."
         case .tags: return selectedTag == nil ? "Add tags to commands to filter by tag." : "No commands use the tag \"\(selectedTag ?? "")\"."
@@ -89,6 +95,7 @@ struct CommandListView: View {
     private var searchPlaceholder: String {
         switch selectedTab {
         case .all: return "Search by title, command, tags, project, or tool"
+        case .pinned: return "Search in pinned commands"
         case .project: return "Search in projects"
         case .tool: return "Search in tools"
         case .tags: return selectedTag == nil ? "Search in tagged commands" : "Search in \"\(selectedTag ?? "")\""
@@ -100,6 +107,8 @@ struct CommandListView: View {
         let list = filteredCommands
         switch selectedTab {
         case .all:
+            return []
+        case .pinned:
             return []
         case .project:
             let grouped = Dictionary(grouping: list) { ($0.project ?? "").trimmingCharacters(in: .whitespaces) }
@@ -117,6 +126,7 @@ struct CommandListView: View {
     private var showGroupedSections: Bool {
         switch selectedTab {
         case .all: return false
+        case .pinned: return false
         case .project, .tool: return true
         case .tags: return selectedTag == nil && !filteredCommands.isEmpty
         }
