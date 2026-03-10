@@ -82,8 +82,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showPopover(_ sender: Any?) {
         guard let button = statusItem.button else { return }
+
+        // Bring the app to foreground before showing the popover.
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+
+        // After showing, ensure the popover window is key and the content
+        // view (not the TextField) is the first responder.
+        // Two passes: immediate + delayed, to handle the first-launch case
+        // where the app isn't fully activated yet.
+        activatePopoverWindow()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.activatePopoverWindow()
+        }
+    }
+
+    private func activatePopoverWindow() {
+        guard let vc = popover.contentViewController,
+              let window = vc.view.window else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(vc.view)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

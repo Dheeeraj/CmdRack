@@ -7,14 +7,15 @@ import SwiftUI
 import AppKit
 
 struct RecentCommandsView: View {
-    @State private var commands: [CommandItem] = []
+    @State private var pinnedCommands: [CommandItem] = []
+    @State private var recentCommands: [CommandItem] = []
     @State private var errorMessage: String?
     @State private var showCopiedAlert = false
 
     private let repository = CommandRepository()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
 
             if let error = errorMessage {
                 Text(error)
@@ -22,21 +23,22 @@ struct RecentCommandsView: View {
                     .foregroundStyle(.red)
             }
 
-            if commands.isEmpty && errorMessage == nil {
+            // Pinned (up to 5)
+            if !pinnedCommands.isEmpty {
+                sectionHeader("Pinned")
+                commandRows(pinnedCommands, numberShortcuts: true)
+            }
+
+            // Recent (up to 3)
+            if !recentCommands.isEmpty {
+                sectionHeader("Recent")
+                commandRows(recentCommands, numberShortcuts: false)
+            }
+
+            if pinnedCommands.isEmpty && recentCommands.isEmpty && errorMessage == nil {
                 Text("No commands yet")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-            } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(commands.prefix(5)) { item in
-                        CommandRowCompactView(item: item) {
-                            showCopiedToast()
-                        }
-                        if item.id != commands.prefix(5).last?.id {
-                            Divider()
-                        }
-                    }
-                }
             }
         }
         .overlay(alignment: .center) {
@@ -59,6 +61,44 @@ struct RecentCommandsView: View {
         }
     }
 
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private func commandRows(_ items: [CommandItem], numberShortcuts: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                let button = Button {
+                    copyAndToast(item)
+                } label: {
+                    CommandRowCompactView(item: item) { }
+                }
+                .buttonStyle(.plain)
+
+                if numberShortcuts && index < 5 {
+                    button.keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [])
+                } else {
+                    button
+                }
+
+                if index < items.count - 1 {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private func copyAndToast(_ item: CommandItem) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(item.command, forType: .string)
+        showCopiedToast()
+    }
+
     private func showCopiedToast() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             showCopiedAlert = true
@@ -74,7 +114,6 @@ struct RecentCommandsView: View {
     }
 
     private func closeMenuBarWindow() {
-        // Close the menu bar popover window (the key window when ContentView is shown)
         NSApp.keyWindow?.close()
     }
 
@@ -82,7 +121,9 @@ struct RecentCommandsView: View {
         errorMessage = nil
         do {
             let all = try repository.fetchAll()
-            commands = all.sorted { $0.createdAt > $1.createdAt }
+            let sorted = all.sorted { $0.updatedAt > $1.updatedAt }
+            pinnedCommands = sorted.filter(\.pinned).prefix(5).map { $0 }
+            recentCommands = Array(sorted.prefix(3))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -91,7 +132,7 @@ struct RecentCommandsView: View {
 
 struct CommandRowCompactView: View {
     let item: CommandItem
-    let onCopy: () -> Void
+    var onCopy: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -112,16 +153,5 @@ struct CommandRowCompactView: View {
                 .lineLimit(1)
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            copyCommand()
-        }
-    }
-
-    private func copyCommand() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(item.command, forType: .string)
-        onCopy()
     }
 }
-
