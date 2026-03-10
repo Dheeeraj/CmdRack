@@ -11,20 +11,31 @@ struct SettingsView: View {
     @State private var keyCode: UInt16 = 0
     @State private var modifiers: NSEvent.ModifierFlags = []
     @State private var hasPermission = false
+    @State private var showClearDataConfirmation = false
+    @State private var clearDataError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Settings")
-                .font(.headline)
-                .padding(.bottom, 8)
-
+        VStack(alignment: .leading, spacing: 0) {
             Form {
-                Section("General") {
-                    LabeledContent("Version", value: "1.0")
+                Section {
+                    SettingsStyleRow(
+                        title: "Version",
+                        subtitle: "1.0",
+                        showChevron: false,
+                        action: nil
+                    )
+                } header: {
+                    Text("General")
                 }
 
-                Section("Shortcuts") {
-                    LabeledContent("Open CmdRack") {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Global shortcut")
+                            .font(.subheadline.weight(.medium))
+                        Text("Use this shortcut to open CmdRack from anywhere.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+
                         ShortcutRecorderView(keyCode: $keyCode, modifiers: $modifiers)
                             .onChange(of: keyCode) {
                                 shortcutService.updateShortcut(keyCode: keyCode, modifiers: modifiers)
@@ -33,50 +44,97 @@ struct SettingsView: View {
                                 shortcutService.updateShortcut(keyCode: keyCode, modifiers: modifiers)
                             }
                     }
+                    .padding(.vertical, 4)
 
                     if !hasPermission {
                         VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundStyle(.orange)
                                     .font(.caption)
                                 Text("Accessibility permission required for global shortcuts.")
-                                    .font(.caption)
+                                    .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
 
-                            Button("Grant Accessibility Access") {
+                            Button {
                                 shortcutService.requestAccessibilityPermission()
                                 checkPermission()
+                            } label: {
+                                Text("Grant Accessibility Access")
                             }
                             .font(.caption)
                         }
+                        .padding(.top, 2)
                     } else {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 6) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .font(.caption)
                             Text("Accessibility access granted.")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
+                        .padding(.top, 2)
                     }
+                } header: {
+                    Text("Shortcuts")
                 }
 
-                Section("Data") {
-                    Text("Commands are stored in Application Support.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Commands storage")
+                            .font(.subheadline.weight(.medium))
+                        Text("Commands are stored locally in Application Support/CmdRack and never leave your Mac.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+
+                    Button(role: .destructive) {
+                        showClearDataConfirmation = true
+                    } label: {
+                        Label("Clear all commands", systemImage: "trash")
+                    }
+                    .padding(.top, 2)
+                } header: {
+                    Text("Data")
                 }
             }
             .formStyle(.grouped)
         }
-        .padding()
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
             keyCode = shortcutService.keyCode
             modifiers = shortcutService.modifiers
             checkPermission()
+        }
+        .alert("Clear all commands?", isPresented: $showClearDataConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear all", role: .destructive) {
+                clearAllCommands()
+            }
+        } message: {
+            Text("This will permanently delete every command. You cannot undo this.")
+        }
+        .alert("Could not clear data", isPresented: Binding(
+            get: { clearDataError != nil },
+            set: { if !$0 { clearDataError = nil } }
+        )) {
+            Button("OK") { clearDataError = nil }
+        } message: {
+            Text(clearDataError ?? "")
+        }
+    }
+
+    private func clearAllCommands() {
+        let repo = CommandRepository()
+        do {
+            try repo.deleteAll()
+        } catch {
+            clearDataError = error.localizedDescription
         }
     }
 

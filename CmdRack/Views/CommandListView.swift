@@ -155,8 +155,11 @@ struct CommandListView: View {
                             .padding(.vertical, 6)
                             .background(selectedTab == tab ? Color.primary.opacity(0.12) : Color.clear)
                             .clipShape(Capsule())
+                            // Make the whole pill area (and a bit around) clickable
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .padding(.vertical, 2) // slightly taller hit area without changing visual pill
                 }
                 Spacer()
             }
@@ -258,6 +261,9 @@ struct CommandListView: View {
             loadCommands()
         }
         .onChange(of: refreshID) {
+            loadCommands()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
             loadCommands()
         }
         .alert("Delete Command?", isPresented: $showDeleteConfirmation, presenting: commandPendingDelete) { item in

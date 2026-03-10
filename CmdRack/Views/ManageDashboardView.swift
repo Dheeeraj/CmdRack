@@ -32,9 +32,8 @@ struct ManageDashboardView: View {
                     id: \.self,
                     selection: $selectedSection
                 ) { section in
-                    NavigationLink(value: section) {
-                        Label(section.rawValue, systemImage: section.icon)
-                    }
+                    Label(section.rawValue, systemImage: section.icon)
+                        .tag(section)
                 }
                 .listStyle(.sidebar)
 
@@ -43,14 +42,34 @@ struct ManageDashboardView: View {
                 Button {
                     selectedSection = .settings
                 } label: {
-                    Label("Settings", systemImage: DashboardSection.settings.icon)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                    HStack {
+                        Label(DashboardSection.settings.rawValue, systemImage: DashboardSection.settings.icon)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        Group {
+                            if selectedSection == .settings {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.accentColor.opacity(0.25))
+                            } else {
+                                Color.clear
+                            }
+                        }
+                    )
+                    .foregroundStyle(
+                        selectedSection == .settings
+                        ? Color.white
+                        : Color.primary
+                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.bottom, 8)
-                .padding(.top, 4)
+                // Outer padding acts as vertical margin without growing the blue highlight
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {

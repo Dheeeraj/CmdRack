@@ -35,6 +35,7 @@ final class CommandRepository {
             try queue.write { db in
                 try command.insert(db)
             }
+            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
@@ -48,6 +49,7 @@ final class CommandRepository {
             try queue.write { db in
                 try command.update(db)
             }
+            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
@@ -61,9 +63,20 @@ final class CommandRepository {
             try queue.write { db in
                 try CommandItem.filter(Column("id") == id.uuidString).deleteAll(db)
             }
+            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
+    }
+
+    func deleteAll() throws {
+        guard let queue = database.queue else {
+            throw CommandRepositoryError.databaseUnavailable
+        }
+        try queue.write { db in
+            try CommandItem.deleteAll(db)
+        }
+        NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
     }
 
     func fetchByTool(_ tool: String) throws -> [CommandItem] {

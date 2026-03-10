@@ -54,6 +54,9 @@ struct RecentCommandsView: View {
             }
         }
         .onAppear(perform: load)
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
+            load()
+        }
     }
 
     private func showCopiedToast() {
