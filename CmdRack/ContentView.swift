@@ -68,7 +68,7 @@ struct ContentView: View {
                     // Search results (when user typed more than 1 char)
                     if searchText.count > 1 {
                         if searchResults.isEmpty {
-                            Text("No such command. Check spelling?")
+                            Text("No such command. try typing a different command")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .padding(.vertical, 4)

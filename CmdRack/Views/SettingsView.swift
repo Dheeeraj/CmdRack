@@ -13,21 +13,11 @@ struct SettingsView: View {
     @State private var hasPermission = false
     @State private var showClearDataConfirmation = false
     @State private var clearDataError: String?
+    @State private var settings = AppSettings.load()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Form {
-                Section {
-                    SettingsStyleRow(
-                        title: "Version",
-                        subtitle: "1.0",
-                        showChevron: false,
-                        action: nil
-                    )
-                } header: {
-                    Text("General")
-                }
-
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Global shortcut")
@@ -82,6 +72,48 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    HStack {
+                        Text("Pinned commands shown")
+                        Spacer()
+                        Slider(
+                            value: Binding(
+                                get: { Double(settings.pinnedDisplayCount) },
+                                set: { settings.pinnedDisplayCount = Int($0) }
+                            ),
+                            in: 1...10,
+                            step: 1
+                        )
+                        .frame(maxWidth: 160)
+                        Text("\(settings.pinnedDisplayCount)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 30, alignment: .trailing)
+                    }
+
+                    HStack {
+                        Text("Recent commands shown")
+                        Spacer()
+                        Slider(
+                            value: Binding(
+                                get: { Double(settings.recentDisplayCount) },
+                                set: { settings.recentDisplayCount = Int($0) }
+                            ),
+                            in: 1...10,
+                            step: 1
+                        )
+                        .frame(maxWidth: 160)
+                        Text("\(settings.recentDisplayCount)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 30, alignment: .trailing)
+                    }
+                } header: {
+                    Text("Menu bar options")
+                } footer: {
+                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each).")
+                }
+
+                Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Commands storage")
                             .font(.subheadline.weight(.medium))
@@ -100,6 +132,18 @@ struct SettingsView: View {
                 } header: {
                     Text("Data")
                 }
+
+                Section {
+                    SettingsStyleRow(
+                        title: "Version",
+                        subtitle: "1.0",
+                        showChevron: false,
+                        action: nil
+                    )
+                } header: {
+                    Text("General")
+                }
+
             }
             .formStyle(.grouped)
         }
@@ -109,7 +153,11 @@ struct SettingsView: View {
         .onAppear {
             keyCode = shortcutService.keyCode
             modifiers = shortcutService.modifiers
+            settings = AppSettings.load()
             checkPermission()
+        }
+        .onChange(of: settings) { _, newValue in
+            newValue.save()
         }
         .alert("Clear all commands?", isPresented: $showClearDataConfirmation) {
             Button("Cancel", role: .cancel) { }
