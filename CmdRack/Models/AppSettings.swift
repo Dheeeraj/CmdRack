@@ -17,10 +17,16 @@ struct AppSettings: Codable, Equatable {
     /// Whether pinned commands get number-key shortcuts (1–N).
     var pinnedShortcutsEnabled: Bool = true
 
+    /// Custom shortcut keys for pinned slots 1–10 (single character each). Default: 1,2,3,4,5,6,7,8,9,0.
+    var pinnedShortcutKeys: [String] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+
     // MARK: - Recent (copy-based)
 
     /// How many recently-copied commands to show in the popup (1–10, default 3).
     var recentDisplayCount: Int = 3
+
+    /// Custom shortcut keys for recent slots 1–10 (single character each). Default: q,w,e,r,t,y,u,i,o,p.
+    var recentShortcutKeys: [String] = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]
 
     /// Internal storage limit for the recent-copied list (always 10).
     static let recentStorageLimit: Int = 10
@@ -41,6 +47,12 @@ struct AppSettings: Codable, Equatable {
         var copy = self
         copy.pinnedDisplayCount = max(1, min(10, copy.pinnedDisplayCount))
         copy.recentDisplayCount = max(1, min(10, copy.recentDisplayCount))
+        if copy.pinnedShortcutKeys.count != 10 {
+            copy.pinnedShortcutKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+        }
+        if copy.recentShortcutKeys.count != 10 {
+            copy.recentShortcutKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]
+        }
         return copy
     }
 }

@@ -14,6 +14,10 @@ struct SettingsView: View {
     @State private var showClearDataConfirmation = false
     @State private var clearDataError: String?
     @State private var settings = AppSettings.load()
+    @State private var showPinnedShortcutsSheet = false
+    @State private var showRecentShortcutsSheet = false
+    @State private var editPinnedKeys: [String] = []
+    @State private var editRecentKeys: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -120,10 +124,46 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(.plain)
+
+                    Button {
+                        editPinnedKeys = settings.pinnedShortcutKeys
+                        if editPinnedKeys.count != 10 { editPinnedKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] }
+                        showPinnedShortcutsSheet = true
+                    } label: {
+                        HStack {
+                            Text("Pinned command shortcuts (1–10)")
+                            Spacer()
+                            Text(settings.pinnedShortcutKeys.prefix(5).joined() + (settings.pinnedShortcutKeys.count > 5 ? "…" : ""))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        editRecentKeys = settings.recentShortcutKeys
+                        if editRecentKeys.count != 10 { editRecentKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"] }
+                        showRecentShortcutsSheet = true
+                    } label: {
+                        HStack {
+                            Text("Recent command shortcuts (1–10)")
+                            Spacer()
+                            Text(settings.recentShortcutKeys.prefix(5).joined() + (settings.recentShortcutKeys.count > 5 ? "…" : ""))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("Menu bar options")
                 } footer: {
-                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder.")
+                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder. Shortcuts default to 1–0 for pinned and q–p for recent.")
                 }
 
                 Section {
@@ -188,6 +228,36 @@ struct SettingsView: View {
         } message: {
             Text(clearDataError ?? "")
         }
+        .sheet(isPresented: $showPinnedShortcutsSheet) {
+            ShortcutKeysSheetView(
+                title: "Pinned shortcuts",
+                keys: $editPinnedKeys,
+                onDismiss: {
+                    showPinnedShortcutsSheet = false
+                    if editPinnedKeys.count == 10 {
+                        var updated = settings
+                        updated.pinnedShortcutKeys = editPinnedKeys
+                        updated.save()
+                        settings = updated
+                    }
+                }
+            )
+        }
+        .sheet(isPresented: $showRecentShortcutsSheet) {
+            ShortcutKeysSheetView(
+                title: "Recent shortcuts",
+                keys: $editRecentKeys,
+                onDismiss: {
+                    showRecentShortcutsSheet = false
+                    if editRecentKeys.count == 10 {
+                        var updated = settings
+                        updated.recentShortcutKeys = editRecentKeys
+                        updated.save()
+                        settings = updated
+                    }
+                }
+            )
+        }
     }
 
     private func clearAllCommands() {
@@ -201,6 +271,46 @@ struct SettingsView: View {
 
     private func checkPermission() {
         hasPermission = shortcutService.hasAccessibilityPermission
+    }
+}
+
+// MARK: - Shortcut keys editor sheet
+private struct ShortcutKeysSheetView: View {
+    let title: String
+    @Binding var keys: [String]
+    var onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            Divider()
+            List {
+                ForEach(0..<10, id: \.self) { i in
+                    HStack {
+                        Text("Slot \(i + 1)")
+                            .frame(width: 50, alignment: .leading)
+                        SingleKeyRecorderView(key: Binding(
+                            get: { keys.indices.contains(i) ? keys[i] : "" },
+                            set: { newVal in
+                                var copy = keys
+                                while copy.count <= i { copy.append("") }
+                                copy[i] = newVal
+                                keys = copy
+                            }
+                        ))
+                    }
+                }
+            }
+            .listStyle(.inset)
+        }
+        .frame(minWidth: 280, minHeight: 340)
     }
 }
 

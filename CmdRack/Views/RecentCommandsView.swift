@@ -66,13 +66,13 @@ struct RecentCommandsView: View {
             }
 
             if !recentCommands.isEmpty {
-                let recentKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]
                 CommandListSectionView(
                     title: "Recent",
                     items: recentCommands,
                     shortcutKeyForIndex: { index in
-                        guard index < recentKeys.count else { return nil }
-                        return recentKeys[index]
+                        guard index < settings.recentShortcutKeys.count else { return nil }
+                        let k = settings.recentShortcutKeys[index]
+                        return k.isEmpty ? nil : k
                     },
                     onSelect: copyAndToast
                 )

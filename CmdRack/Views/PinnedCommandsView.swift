@@ -27,8 +27,9 @@ struct PinnedCommandsView: View {
                     title: "Pinned",
                     items: pinnedCommands,
                     shortcutKeyForIndex: settings.pinnedShortcutsEnabled ? { index in
-                        guard index < 10 else { return nil }
-                        return index < 9 ? String(index + 1) : "0"
+                        guard index < settings.pinnedShortcutKeys.count else { return nil }
+                        let k = settings.pinnedShortcutKeys[index]
+                        return k.isEmpty ? nil : k
                     } : { _ in nil },
                     onSelect: copyAndToast
                 )
