@@ -44,6 +44,7 @@ struct CommandListSectionView: View {
 
 struct RecentCommandsView: View {
     @State private var recentCommands: [CommandItem] = []
+    @State private var settings = AppSettings.load()
     @State private var errorMessage: String?
     @State private var showCopiedAlert = false
 
@@ -84,15 +85,32 @@ struct RecentCommandsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
             load()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackRecentCopiedDidChange)) { _ in
+            load()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
+            settings = AppSettings.load()
+            load()
+        }
     }
 
-    // Replace with your own source when not using DB
+    /// Loads recently *copied* commands (not recently added).
+    /// Uses the tracker's ordered ID list, resolves them from DB, and shows up to recentDisplayCount.
     private func load() {
         errorMessage = nil
         do {
-            let all = try repository.fetchAll()
-            let sorted = all.sorted { $0.updatedAt > $1.updatedAt }
-            recentCommands = Array(sorted.prefix(3))
+            let copiedIDs = RecentCopiedTracker.shared.ids
+            guard !copiedIDs.isEmpty else {
+                recentCommands = []
+                return
+            }
+            let allByID = Dictionary(
+                uniqueKeysWithValues: try repository.fetchAll().map { ($0.id, $0) }
+            )
+            recentCommands = copiedIDs
+                .compactMap { allByID[$0] }
+                .prefix(settings.recentDisplayCount)
+                .map { $0 }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -102,6 +120,7 @@ struct RecentCommandsView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(item.command, forType: .string)
+        RecentCopiedTracker.shared.recordCopy(id: item.id)
         showCopiedToast()
     }
 

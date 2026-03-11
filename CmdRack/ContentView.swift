@@ -245,6 +245,7 @@ struct ContentView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(item.command, forType: .string)
+        RecentCopiedTracker.shared.recordCopy(id: item.id)
         showCopiedToast()
     }
 

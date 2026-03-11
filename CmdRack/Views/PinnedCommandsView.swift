@@ -8,6 +8,7 @@ import AppKit
 
 struct PinnedCommandsView: View {
     @State private var pinnedCommands: [CommandItem] = []
+    @State private var settings = AppSettings.load()
     @State private var errorMessage: String?
     @State private var showCopiedAlert = false
 
@@ -25,7 +26,7 @@ struct PinnedCommandsView: View {
                 CommandListSectionView(
                     title: "Pinned",
                     items: pinnedCommands,
-                    numberShortcuts: true,
+                    numberShortcuts: settings.pinnedShortcutsEnabled,
                     onSelect: copyAndToast
                 )
             }
@@ -48,15 +49,18 @@ struct PinnedCommandsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
             load()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
+            settings = AppSettings.load()
+            load()
+        }
     }
 
-    // Replace with your own source when not using DB
     private func load() {
         errorMessage = nil
         do {
             let all = try repository.fetchAll()
             let sorted = all.sorted { $0.updatedAt > $1.updatedAt }
-            pinnedCommands = sorted.filter(\.pinned).prefix(5).map { $0 }
+            pinnedCommands = Array(sorted.filter(\.pinned).prefix(settings.pinnedDisplayCount))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -66,6 +70,7 @@ struct PinnedCommandsView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(item.command, forType: .string)
+        RecentCopiedTracker.shared.recordCopy(id: item.id)
         showCopiedToast()
     }
 
