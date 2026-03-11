@@ -107,10 +107,23 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 30, alignment: .trailing)
                     }
+
+                    Button {
+                        NotificationCenter.default.post(name: .cmdRackSwitchToPinnedTab, object: nil)
+                    } label: {
+                        HStack {
+                            Text("Arrange pinned commands")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("Menu bar options")
                 } footer: {
-                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each).")
+                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder.")
                 }
 
                 Section {

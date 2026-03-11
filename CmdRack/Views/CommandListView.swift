@@ -16,6 +16,7 @@ enum CommandListTab: String, CaseIterable {
 struct CommandListView: View {
     var onEdit: ((CommandItem) -> Void)?
     var refreshID: Int = 0
+    @Binding var focusPinnedTab: Bool
 
     @State private var commands: [CommandItem] = []
     @State private var searchText = ""
@@ -24,6 +25,9 @@ struct CommandListView: View {
     @State private var errorMessage: String?
     @State private var commandPendingDelete: CommandItem?
     @State private var showDeleteConfirmation = false
+    @State private var settings = AppSettings.load()
+    @State private var pinnedWorking: [CommandItem] = []
+    @State private var draggingPinnedItem: CommandItem?
 
     private let repository = CommandRepository()
 
@@ -32,7 +36,7 @@ struct CommandListView: View {
         case .all:
             return commands
         case .pinned:
-            return commands.filter { $0.pinned }
+            return pinnedWorking
         case .project:
             return commands.filter { ($0.project ?? "").trimmingCharacters(in: .whitespaces) != "" }
         case .tool:
@@ -259,22 +263,57 @@ struct CommandListView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             } else {
-                List(filteredCommands) { item in
-                    commandRow(item)
+                if selectedTab == .pinned {
+                    ScrollView {
+                        LazyVStack(spacing: 4) {
+                            ForEach(Array(filteredCommands.enumerated()), id: \.element.id) { index, item in
+                                pinnedRow(item, index: index)
+                                    .draggable(item.id.uuidString) {
+                                        pinnedDragPreview(item)
+                                    }
+                                    .dropDestination(for: String.self) { droppedIDs, _ in
+                                        guard let uuidString = droppedIDs.first,
+                                              let draggedID = UUID(uuidString: uuidString),
+                                              let fromIndex = pinnedWorking.firstIndex(where: { $0.id == draggedID }),
+                                              fromIndex != index else { return false }
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            pinnedWorking.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: index > fromIndex ? index + 1 : index)
+                                        }
+                                        PinnedOrderStore.shared.saveOrder(for: pinnedWorking)
+                                        return true
+                                    }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                    }
+                } else {
+                    List(filteredCommands) { item in
+                        commandRow(item)
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { loadCommands() }
+        .onChange(of: refreshID) { loadCommands() }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in loadCommands() }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
+            settings = AppSettings.load()
+        }
+        .onChange(of: focusPinnedTab) { _, isFocus in
+            if isFocus {
+                selectedTab = .pinned
+                focusPinnedTab = false
+            }
+        }
         .onAppear {
-            loadCommands()
-        }
-        .onChange(of: refreshID) {
-            loadCommands()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
-            loadCommands()
+            if focusPinnedTab {
+                selectedTab = .pinned
+                focusPinnedTab = false
+            }
         }
         .alert("Delete Command?", isPresented: $showDeleteConfirmation, presenting: commandPendingDelete) { item in
             Button("Delete", role: .destructive) {
@@ -326,11 +365,55 @@ struct CommandListView: View {
         }
     }
 
+    @ViewBuilder
+    private func pinnedRow(_ item: CommandItem, index: Int) -> some View {
+        let isPrimary = index < settings.pinnedDisplayCount
+
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text(commandSubtitle(item))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isPrimary ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.05))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { onEdit?(item) }
+    }
+
+    @ViewBuilder
+    private func pinnedDragPreview(_ item: CommandItem) -> some View {
+        Text(item.title)
+            .font(.caption)
+            .fontWeight(.medium)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
     private func loadCommands() {
         errorMessage = nil
         do {
             let all = try repository.fetchAll()
             commands = all.sorted { $0.updatedAt > $1.updatedAt }
+            let pinnedAll = commands.filter(\.pinned)
+            pinnedWorking = PinnedOrderStore.shared.applyOrder(to: pinnedAll)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -348,5 +431,5 @@ struct CommandListView: View {
 }
 
 #Preview {
-    CommandListView(onEdit: nil, refreshID: 0)
+    CommandListView(onEdit: nil, refreshID: 0, focusPinnedTab: .constant(false))
 }

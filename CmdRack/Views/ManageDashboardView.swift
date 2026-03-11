@@ -23,6 +23,7 @@ struct ManageDashboardView: View {
     @State private var showAddCommandSheet = false
     @State private var commandToEdit: CommandItem?
     @State private var refreshCommandsID = 0
+    @State private var focusPinnedTab = false
 
     var body: some View {
         NavigationSplitView {
@@ -81,7 +82,8 @@ struct ManageDashboardView: View {
                             commandToEdit = item
                             showAddCommandSheet = true
                         },
-                        refreshID: refreshCommandsID
+                        refreshID: refreshCommandsID,
+                        focusPinnedTab: $focusPinnedTab
                     )
                 case .settings:
                     SettingsView()
@@ -113,6 +115,10 @@ struct ManageDashboardView: View {
         }
         .onAppear {
             bringWindowToFront()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackSwitchToPinnedTab)) { _ in
+            selectedSection = .commands
+            focusPinnedTab = true
         }
     }
 

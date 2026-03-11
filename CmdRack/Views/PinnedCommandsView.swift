@@ -53,14 +53,18 @@ struct PinnedCommandsView: View {
             settings = AppSettings.load()
             load()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackPinnedOrderDidChange)) { _ in
+            load()
+        }
     }
 
     private func load() {
         errorMessage = nil
         do {
             let all = try repository.fetchAll()
-            let sorted = all.sorted { $0.updatedAt > $1.updatedAt }
-            pinnedCommands = Array(sorted.filter(\.pinned).prefix(settings.pinnedDisplayCount))
+            let pinnedAll = all.filter(\.pinned)
+            let ordered = PinnedOrderStore.shared.applyOrder(to: pinnedAll)
+            pinnedCommands = Array(ordered.prefix(settings.pinnedDisplayCount))
         } catch {
             errorMessage = error.localizedDescription
         }
