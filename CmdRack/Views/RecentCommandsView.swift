@@ -130,17 +130,10 @@ struct CommandRowCompactView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Text(item.title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                if item.pinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(item.title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .lineLimit(1)
             Text(item.command)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
