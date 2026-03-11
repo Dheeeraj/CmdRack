@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
@@ -89,15 +90,82 @@ struct ContentView: View {
                 .transition(.opacity)
             }
 
+            PinnedCommandsView()
+
+            Divider()
+
             RecentCommandsView()
+
+            Divider()
+
+            Button {
+                openWindow(id: "add-command")
+            } label: {
+                HStack {
+                    Text("Add Command")
+                    Spacer()
+                    Text("=")
+                        .font(.system(.caption2, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.primary.opacity(0.08))
+                        )
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("=", modifiers: [])
 
             Button {
                 openWindow(id: "manage")
             } label: {
-                Label("Manage / Settings", systemImage: "gearshape")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack {
+                    Text("Manage / Settings")
+                    Spacer()
+                    Text("M")
+                        .font(.system(.caption2, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.primary.opacity(0.08))
+                        )
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .keyboardShortcut("m", modifiers: [])
+
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                HStack {
+                    Text("Quit")
+                    Spacer()
+                    Text("⌫")
+                        .font(.system(.caption2, design: .rounded))
+                        .fontWeight(.medium)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.primary.opacity(0.08))
+                        )
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.delete, modifiers: [])
         }
         .padding()
         .frame(width: 340)

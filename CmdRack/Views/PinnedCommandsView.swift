@@ -1,49 +1,13 @@
 //
-//  RecentCommandsView.swift
+//  PinnedCommandsView.swift
 //  CmdRack
 //
 
 import SwiftUI
 import AppKit
 
-// MARK: - Reusable command list section (no per-row dividers; whole section is one block)
-struct CommandListSectionView: View {
-    let title: String
-    let items: [CommandItem]
-    var numberShortcuts: Bool = false
-    var onSelect: (CommandItem) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    let button = Button {
-                        onSelect(item)
-                    } label: {
-                        CommandRowCompactView(item: item) { }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if numberShortcuts && index < 5 {
-                        button.keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [])
-                    } else {
-                        button
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct RecentCommandsView: View {
-    @State private var recentCommands: [CommandItem] = []
+struct PinnedCommandsView: View {
+    @State private var pinnedCommands: [CommandItem] = []
     @State private var errorMessage: String?
     @State private var showCopiedAlert = false
 
@@ -57,11 +21,11 @@ struct RecentCommandsView: View {
                     .foregroundStyle(.red)
             }
 
-            if !recentCommands.isEmpty {
+            if !pinnedCommands.isEmpty {
                 CommandListSectionView(
-                    title: "Recent",
-                    items: recentCommands,
-                    numberShortcuts: false,
+                    title: "Pinned",
+                    items: pinnedCommands,
+                    numberShortcuts: true,
                     onSelect: copyAndToast
                 )
             }
@@ -92,7 +56,7 @@ struct RecentCommandsView: View {
         do {
             let all = try repository.fetchAll()
             let sorted = all.sorted { $0.updatedAt > $1.updatedAt }
-            recentCommands = Array(sorted.prefix(3))
+            pinnedCommands = sorted.filter(\.pinned).prefix(5).map { $0 }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -121,31 +85,5 @@ struct RecentCommandsView: View {
 
     private func closeMenuBarWindow() {
         NSApp.keyWindow?.close()
-    }
-}
-
-struct CommandRowCompactView: View {
-    let item: CommandItem
-    var onCopy: (() -> Void)? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Text(item.title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                if item.pinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Text(item.command)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .contentShape(Rectangle())
     }
 }

@@ -426,7 +426,11 @@ struct AddCommandView: View {
         do {
             try repository.delete(id: item.id)
             onSave?()
-            onDismiss?()
+            if let onDismiss {
+                onDismiss()
+            } else {
+                closeWindow()
+            }
         } catch {
             errors = [error.localizedDescription]
         }
@@ -482,7 +486,11 @@ struct AddCommandView: View {
                 try repository.insert(item)
             }
             onSave?()
-            onDismiss?()
+            if let onDismiss {
+                onDismiss()
+            } else {
+                closeWindow()
+            }
         } catch {
             errors = [error.localizedDescription]
         }

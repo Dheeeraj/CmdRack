@@ -38,6 +38,13 @@ struct CmdRackApp: App {
         .windowResizability(.contentSize)
         .commands { CommandGroup(replacing: .newItem) { } }
         .defaultLaunchBehavior(.suppressed)
+
+        Window("Add Command", id: "add-command") {
+            AddCommandView()
+        }
+        .defaultSize(width: 520, height: 520)
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
     }
 }
 
