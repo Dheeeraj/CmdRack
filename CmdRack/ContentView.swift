@@ -148,16 +148,7 @@ struct ContentView: View {
                 HStack {
                     Text("Add Command")
                     Spacer()
-                    Text("=")
-                        .font(.system(.caption2, design: .rounded))
-                        .fontWeight(.medium)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.primary.opacity(0.08))
-                        )
+                    ShortcutBadge(key: "=")
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
@@ -171,16 +162,7 @@ struct ContentView: View {
                 HStack {
                     Text("Manage / Settings")
                     Spacer()
-                    Text("M")
-                        .font(.system(.caption2, design: .rounded))
-                        .fontWeight(.medium)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.primary.opacity(0.08))
-                        )
+                    ShortcutBadge(key: "M")
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
@@ -194,16 +176,7 @@ struct ContentView: View {
                 HStack {
                     Text("Quit")
                     Spacer()
-                    Text("⌫")
-                        .font(.system(.caption2, design: .rounded))
-                        .fontWeight(.medium)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.primary.opacity(0.08))
-                        )
+                    ShortcutBadge(key: "⌫")
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())

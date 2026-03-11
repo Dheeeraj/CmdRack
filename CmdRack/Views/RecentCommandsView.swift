@@ -10,7 +10,8 @@ import AppKit
 struct CommandListSectionView: View {
     let title: String
     let items: [CommandItem]
-    var numberShortcuts: Bool = false
+    /// For each row index, return the shortcut key to show and use (e.g. "1", "q"). Nil = no shortcut.
+    var shortcutKeyForIndex: (Int) -> String? = { _ in nil }
     var onSelect: (CommandItem) -> Void
 
     var body: some View {
@@ -22,17 +23,23 @@ struct CommandListSectionView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    let shortcutKey = shortcutKeyForIndex(index)
                     let button = Button {
                         onSelect(item)
                     } label: {
-                        CommandRowCompactView(item: item) { }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
+                        HStack {
+                            CommandRowCompactView(item: item) { }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            if let key = shortcutKey {
+                                ShortcutBadge(key: key)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
 
-                    if numberShortcuts && index < 5 {
-                        button.keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [])
+                    if let key = shortcutKey, key.count == 1 {
+                        button.keyboardShortcut(KeyEquivalent(Character(key)), modifiers: [])
                     } else {
                         button
                     }
@@ -59,10 +66,14 @@ struct RecentCommandsView: View {
             }
 
             if !recentCommands.isEmpty {
+                let recentKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]
                 CommandListSectionView(
                     title: "Recent",
                     items: recentCommands,
-                    numberShortcuts: false,
+                    shortcutKeyForIndex: { index in
+                        guard index < recentKeys.count else { return nil }
+                        return recentKeys[index]
+                    },
                     onSelect: copyAndToast
                 )
             }

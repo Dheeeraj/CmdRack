@@ -26,7 +26,10 @@ struct PinnedCommandsView: View {
                 CommandListSectionView(
                     title: "Pinned",
                     items: pinnedCommands,
-                    numberShortcuts: settings.pinnedShortcutsEnabled,
+                    shortcutKeyForIndex: settings.pinnedShortcutsEnabled ? { index in
+                        guard index < 10 else { return nil }
+                        return index < 9 ? String(index + 1) : "0"
+                    } : { _ in nil },
                     onSelect: copyAndToast
                 )
             }
