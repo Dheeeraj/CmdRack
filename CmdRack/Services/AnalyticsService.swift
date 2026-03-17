@@ -115,6 +115,58 @@ final class AnalyticsService {
         countEvents(type: AnalyticsEventType.popoverOpenClick.rawValue)
     }
 
+    func totalCommandsCopied(lastDays: Int? = nil) -> Int {
+        guard let queue = database.queue else { return 0 }
+        do {
+            return try queue.read { db in
+                var sql = "SELECT COUNT(*) FROM analytics_events WHERE type = ?"
+                var args: [DatabaseValueConvertible] = [AnalyticsEventType.commandCopied.rawValue]
+                if let days = lastDays, days > 0 {
+                    sql += " AND timestamp >= DATE('now', ?)"
+                    args.append("-\(days - 1) days")
+                }
+                return try Int.fetchOne(db, sql: sql, arguments: StatementArguments(args)) ?? 0
+            }
+        } catch {
+            return 0
+        }
+    }
+
+    func dailyCommandCopies(lastDays: Int) -> [DailyCount] {
+        guard lastDays > 0, let queue = database.queue else { return [] }
+        do {
+            return try queue.read { db in
+                let rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                    SELECT DATE(timestamp) AS day, COUNT(*) AS c
+                    FROM analytics_events
+                    WHERE type = ?
+                      AND timestamp >= DATE('now', ?)
+                    GROUP BY day
+                    ORDER BY day ASC
+                    """,
+                    arguments: [
+                        AnalyticsEventType.commandCopied.rawValue,
+                        "-\(lastDays - 1) days"
+                    ]
+                )
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withFullDate]
+                return rows.compactMap { row in
+                    if let dayString: String = row["day"],
+                       let date = formatter.date(from: dayString) {
+                        let count: Int = row["c"]
+                        return DailyCount(date: date, count: count)
+                    }
+                    return nil
+                }
+            }
+        } catch {
+            return []
+        }
+    }
+
     private func countEvents(type: String) -> Int {
         guard let queue = database.queue else { return 0 }
         do {

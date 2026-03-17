@@ -31,7 +31,7 @@ struct CmdRackApp: App {
     }()
 
     var body: some Scene {
-        Window("CmdRack", id: "manage") {
+        Window("Command Rack", id: "manage") {
             ManageDashboardView()
         }
         .defaultSize(width: 720, height: 480)
