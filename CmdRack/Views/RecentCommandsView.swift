@@ -132,6 +132,7 @@ struct RecentCommandsView: View {
         pasteboard.clearContents()
         pasteboard.setString(item.command, forType: .string)
         RecentCopiedTracker.shared.recordCopy(id: item.id)
+        AnalyticsService.shared.trackCommandCopied(item)
         showCopiedToast()
     }
 

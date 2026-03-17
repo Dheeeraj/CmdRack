@@ -217,6 +217,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Force-unlock Activity tab (debug)", isOn: $settings.debugUnlockActivityTab)
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text("For development only. When enabled, the Activity tab is available immediately without waiting 3 days after first install.")
+                }
+
+                Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Commands storage")
                             .font(.subheadline.weight(.medium))

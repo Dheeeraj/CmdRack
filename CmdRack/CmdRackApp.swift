@@ -51,6 +51,8 @@ struct CmdRackApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
+    /// Set to true when opening from global shortcut so we can record the correct analytics trigger.
+    private var openingViaShortcut = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -75,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupGlobalShortcut() {
         GlobalShortcutService.shared.register { [weak self] in
+            self?.openingViaShortcut = true
             self?.togglePopover(nil)
         }
     }
@@ -93,6 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Bring the app to foreground before showing the popover.
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        let trigger: PopoverOpenTrigger = openingViaShortcut ? .shortcut : .click
+        openingViaShortcut = false
+        AnalyticsService.shared.trackPopoverOpen(trigger: trigger)
 
         // After showing, ensure the popover window is key and the content
         // view (not the TextField) is the first responder.

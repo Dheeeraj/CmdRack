@@ -26,6 +26,14 @@ struct AppSettings: Codable, Equatable {
     /// Must be <= `sqliteTextMax`.
     var tagTextMax: Int = 128  // default
 
+    // MARK: - Activity / Analytics
+
+    /// When the app was first run on this Mac; used to unlock the Activity tab after 3 days.
+    var firstRunDate: Date = Date()
+
+    /// Dev flag to force-unlock the Activity tab without waiting 3 days.
+    var debugUnlockActivityTab: Bool = false
+
     // MARK: - Pinned
 
     /// How many pinned commands to show in the popup (1–10, default 5).

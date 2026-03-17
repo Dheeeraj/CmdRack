@@ -71,6 +71,20 @@ final class DatabaseService {
             }
         }
 
+        migrator.registerMigration("create_analytics_events") { db in
+            try db.create(table: "analytics_events") { t in
+                t.primaryKey("id", .text)
+                t.column("type", .text).notNull()
+                t.column("commandId", .text)
+                t.column("timestamp", .datetime).notNull()
+                t.column("tags", .text)
+                t.column("project", .text)
+                t.column("tool", .text)
+            }
+            try db.create(index: "idx_analytics_events_timestamp", on: "analytics_events", columns: ["timestamp"])
+            try db.create(index: "idx_analytics_events_type_timestamp", on: "analytics_events", columns: ["type", "timestamp"])
+        }
+
         try migrator.migrate(writer)
     }
 }

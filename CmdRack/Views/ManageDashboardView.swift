@@ -8,11 +8,13 @@ import AppKit
 
 enum DashboardSection: String, CaseIterable {
     case commands = "Commands"
+    case activity = "Activity"
     case settings = "Settings"
 
     var icon: String {
         switch self {
         case .commands: return "list.bullet"
+        case .activity: return "chart.bar.xaxis"
         case .settings: return "gearshape"
         }
     }
@@ -42,13 +44,9 @@ struct ManageDashboardView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(
-                    DashboardSection.allCases.filter { $0 != .settings },
-                    id: \.self,
-                    selection: $selectedSection
-                ) { section in
+                List([DashboardSection.commands, .activity], id: \.self, selection: $selectedSection) { section in
                     Label(section.rawValue, systemImage: section.icon)
-                        .tag(section)
+                        .tag(section as DashboardSection?)
                 }
                 .listStyle(.sidebar)
 
@@ -98,6 +96,8 @@ struct ManageDashboardView: View {
                         refreshID: refreshCommandsID,
                         focusPinnedTab: $focusPinnedTab
                     )
+                case .activity:
+                    ActivityView()
                 case .settings:
                     SettingsView()
                 }
