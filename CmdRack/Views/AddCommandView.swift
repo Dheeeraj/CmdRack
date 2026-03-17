@@ -6,12 +6,6 @@
 import SwiftUI
 import AppKit
 
-private enum Limits {
-    static let textMax   = 1024  // 2^10
-    static let tagMax    = 64   // 2^6
-    static let tagLen    = 128  // 2^7
-}
-
 struct AddCommandView: View {
     var commandToEdit: CommandItem?
     var onDismiss: (() -> Void)?
@@ -27,6 +21,7 @@ struct AddCommandView: View {
     @State private var errors: [String] = []
     @State private var isSaving = false
     @State private var showDeleteConfirm = false
+    @State private var settings = AppSettings.load()
 
     private let repository = CommandRepository()
     private var isEditMode: Bool { commandToEdit != nil }
@@ -69,8 +64,8 @@ struct AddCommandView: View {
                                 fieldLabel("Title", required: true)
                                 TextField("e.g. Summon coffee", text: $title)
                                     .textFieldStyle(.roundedBorder)
-                                    .onChange(of: title) { title = String(title.prefix(Limits.textMax)) }
-                                charCounter(title.count, max: Limits.textMax)
+                                    .onChange(of: title) { title = String(title.prefix(settings.commandTextMax)) }
+                                charCounter(title.count, max: settings.commandTextMax)
                             }
 
                             Divider().opacity(0.25)
@@ -80,8 +75,8 @@ struct AddCommandView: View {
                                 TextField("e.g. Brew coffee", text: $command)
                                     .textFieldStyle(.roundedBorder)
                                     .font(.system(.body, design: .monospaced))
-                                    .onChange(of: command) { command = String(command.prefix(Limits.textMax)) }
-                                charCounter(command.count, max: Limits.textMax)
+                                    .onChange(of: command) { command = String(command.prefix(settings.commandTextMax)) }
+                                charCounter(command.count, max: settings.commandTextMax)
                             }
                         }
                     }
@@ -92,13 +87,13 @@ struct AddCommandView: View {
                             fieldLabel("Project Name")
                             TextField("e.g. Operation ‘No Bugs’", text: $project)
                                 .textFieldStyle(.roundedBorder)
-                                .onChange(of: project) { project = String(project.prefix(Limits.textMax)) }
+                                .onChange(of: project) { project = String(project.prefix(settings.commandTextMax)) }
                         }
                         bentoCard {
                             fieldLabel("Tool")
                             TextField("e.g. docker, git...", text: $tool)
                                 .textFieldStyle(.roundedBorder)
-                                .onChange(of: tool) { tool = String(tool.prefix(Limits.textMax)) }
+                                .onChange(of: tool) { tool = String(tool.prefix(settings.commandTextMax)) }
                         }
                     }
 
@@ -107,16 +102,16 @@ struct AddCommandView: View {
                         HStack {
                             fieldLabel("Tags")
                             Spacer()
-                            Text("\(tags.count)/\(Limits.tagMax)")
+                            Text("\(tags.count)/\(settings.tagMaxCount)")
                                 .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(tags.count >= Limits.tagMax ? Color.red : Color.secondary.opacity(0.5))
+                                .foregroundStyle(tags.count >= settings.tagMaxCount ? Color.red : Color.secondary.opacity(0.5))
                         }
 
                         HStack(spacing: 6) {
                             TextField("Add a tag...", text: $tagInput)
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit { commitTag() }
-                                .onChange(of: tagInput) { tagInput = String(tagInput.prefix(Limits.tagLen)) }
+                                .onChange(of: tagInput) { tagInput = String(tagInput.prefix(settings.tagTextMax)) }
 
                             Button(action: commitTag) {
                                 Image(systemName: "plus.circle.fill")
@@ -205,6 +200,7 @@ struct AddCommandView: View {
             Text("This action cannot be undone.")
         }
         .onAppear {
+            settings = AppSettings.load()
             if let item = commandToEdit {
                 title   = item.title
                 command = item.command
@@ -216,6 +212,9 @@ struct AddCommandView: View {
             if commandToEdit == nil && onDismiss == nil {
                 bringWindowToFront()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
+            settings = AppSettings.load()
         }
     }
 
@@ -259,16 +258,16 @@ struct AddCommandView: View {
 
     private var canAddTag: Bool {
         let clean = tagInput.trimmingCharacters(in: .whitespaces)
-        return !clean.isEmpty && tags.count < Limits.tagMax
+        return !clean.isEmpty && tags.count < settings.tagMaxCount
     }
 
     private func commitTag() {
         let raw = tagInput.trimmingCharacters(in: .whitespaces)
         let newTags = raw.split(separator: ",")
-            .map { String($0.trimmingCharacters(in: .whitespaces).prefix(Limits.tagLen)) }
+            .map { String($0.trimmingCharacters(in: .whitespaces).prefix(settings.tagTextMax)) }
             .filter { !$0.isEmpty && !tags.contains($0) }
 
-        let remaining = Limits.tagMax - tags.count
+        let remaining = settings.tagMaxCount - tags.count
         tags.append(contentsOf: newTags.prefix(remaining))
         tagInput = ""
     }
@@ -287,23 +286,23 @@ struct AddCommandView: View {
         if command.trimmingCharacters(in: .whitespaces).isEmpty {
             errs.append("Command is required")
         }
-        if title.count > Limits.textMax {
-            errs.append("Title exceeds \(Limits.textMax) characters")
+        if title.count > settings.commandTextMax {
+            errs.append("Title exceeds \(settings.commandTextMax) characters")
         }
-        if command.count > Limits.textMax {
-            errs.append("Command exceeds \(Limits.textMax) characters")
+        if command.count > settings.commandTextMax {
+            errs.append("Command exceeds \(settings.commandTextMax) characters")
         }
-        if project.count > Limits.textMax {
-            errs.append("Project exceeds \(Limits.textMax) characters")
+        if project.count > settings.commandTextMax {
+            errs.append("Project exceeds \(settings.commandTextMax) characters")
         }
-        if tool.count > Limits.textMax {
-            errs.append("Tool exceeds \(Limits.textMax) characters")
+        if tool.count > settings.commandTextMax {
+            errs.append("Tool exceeds \(settings.commandTextMax) characters")
         }
-        if tags.count > Limits.tagMax {
-            errs.append("Maximum \(Limits.tagMax) tags allowed")
+        if tags.count > settings.tagMaxCount {
+            errs.append("Maximum \(settings.tagMaxCount) tags allowed")
         }
-        if tags.contains(where: { $0.count > Limits.tagLen }) {
-            errs.append("Each tag must be \(Limits.tagLen) characters or less")
+        if tags.contains(where: { $0.count > settings.tagTextMax }) {
+            errs.append("Each tag must be \(settings.tagTextMax) characters or less")
         }
         return errs
     }

@@ -9,6 +9,23 @@ import Foundation
 /// Add new properties with a default value to extend without breaking existing installs.
 struct AppSettings: Codable, Equatable {
 
+    // MARK: - Command editor limits (stored in SQLite TEXT)
+
+    /// SQLite's maximum TEXT length is finite (usually 1_000_000_000 bytes).
+    /// We keep a hard upper bound so limits are never "unlimited".
+    static let sqliteTextMax: Int = 1_000_000_000
+
+    /// Max characters allowed in title/command/project/tool fields when creating/editing commands.
+    /// Must be <= `sqliteTextMax`.
+    var commandTextMax: Int = 1024  // default
+
+    /// Max number of tags per command. Stored as JSON inside a TEXT column, so still capped by `sqliteTextMax`.
+    var tagMaxCount: Int = 64  // default
+
+    /// Max characters per tag.
+    /// Must be <= `sqliteTextMax`.
+    var tagTextMax: Int = 128  // default
+
     // MARK: - Pinned
 
     /// How many pinned commands to show in the popup (1–10, default 5).
@@ -45,6 +62,9 @@ struct AppSettings: Codable, Equatable {
 
     var validated: AppSettings {
         var copy = self
+        copy.commandTextMax = max(1, min(Self.sqliteTextMax, copy.commandTextMax))
+        copy.tagMaxCount = max(0, min(Self.sqliteTextMax, copy.tagMaxCount))
+        copy.tagTextMax = max(1, min(Self.sqliteTextMax, copy.tagTextMax))
         copy.pinnedDisplayCount = max(1, min(10, copy.pinnedDisplayCount))
         copy.recentDisplayCount = max(1, min(10, copy.recentDisplayCount))
         if copy.pinnedShortcutKeys.count != 10 {

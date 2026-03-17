@@ -19,6 +19,14 @@ struct SettingsView: View {
     @State private var editPinnedKeys: [String] = []
     @State private var editRecentKeys: [String] = []
 
+    private static let intFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .none
+        f.allowsFloats = false
+        f.minimum = 0
+        return f
+    }()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Form {
@@ -164,6 +172,48 @@ struct SettingsView: View {
                     Text("Menu bar options")
                 } footer: {
                     Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder. Shortcuts default to 1–0 for pinned and q–p for recent.")
+                }
+
+                Section {
+                    HStack {
+                        Text("Max text length")
+                        Spacer()
+                        TextField("", value: $settings.commandTextMax, formatter: Self.intFormatter)
+                            .multilineTextAlignment(.trailing)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                        Text("chars")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Text("Max tags per command")
+                        Spacer()
+                        TextField("", value: $settings.tagMaxCount, formatter: Self.intFormatter)
+                            .multilineTextAlignment(.trailing)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                        Text("tags")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Text("Max tag length")
+                        Spacer()
+                        TextField("", value: $settings.tagTextMax, formatter: Self.intFormatter)
+                            .multilineTextAlignment(.trailing)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                        Text("chars")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Command limits")
+                } footer: {
+                    Text("These limits apply when creating or editing commands. Upper bound is capped to SQLite TEXT max (\(AppSettings.sqliteTextMax)). These settings sync via backup/restore.")
                 }
 
                 Section {
