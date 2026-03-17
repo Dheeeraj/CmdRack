@@ -201,20 +201,37 @@ struct AddCommandView: View {
         }
         .onAppear {
             settings = AppSettings.load()
-            if let item = commandToEdit {
-                title   = item.title
-                command = item.command
-                project = item.project ?? ""
-                tool    = item.tool ?? ""
-                tags    = item.tags
-                pinned  = item.pinned
-            }
+            applyCommandToEdit()
             if commandToEdit == nil && onDismiss == nil {
                 bringWindowToFront()
             }
         }
+        .onChange(of: commandToEdit?.id) { _, _ in
+            applyCommandToEdit()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
             settings = AppSettings.load()
+        }
+    }
+
+    private func applyCommandToEdit() {
+        if let item = commandToEdit {
+            title = item.title
+            command = item.command
+            project = item.project ?? ""
+            tool = item.tool ?? ""
+            tags = item.tags
+            pinned = item.pinned
+        } else {
+            // New command
+            title = ""
+            command = ""
+            project = ""
+            tool = ""
+            tagInput = ""
+            tags = []
+            pinned = false
+            errors = []
         }
     }
 

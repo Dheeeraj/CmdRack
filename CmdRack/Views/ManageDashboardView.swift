@@ -20,10 +20,24 @@ enum DashboardSection: String, CaseIterable {
 
 struct ManageDashboardView: View {
     @State private var selectedSection: DashboardSection? = .commands
-    @State private var showAddCommandSheet = false
-    @State private var commandToEdit: CommandItem?
     @State private var refreshCommandsID = 0
     @State private var focusPinnedTab = false
+
+    @State private var activeSheet: ActiveSheet?
+
+    private enum ActiveSheet: Identifiable {
+        case newCommand
+        case editCommand(CommandItem)
+
+        var id: String {
+            switch self {
+            case .newCommand:
+                return "new"
+            case .editCommand(let item):
+                return item.id.uuidString
+            }
+        }
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -79,8 +93,7 @@ struct ManageDashboardView: View {
                 case .commands:
                     CommandListView(
                         onEdit: { item in
-                            commandToEdit = item
-                            showAddCommandSheet = true
+                            activeSheet = .editCommand(item)
                         },
                         refreshID: refreshCommandsID,
                         focusPinnedTab: $focusPinnedTab
@@ -93,25 +106,28 @@ struct ManageDashboardView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        commandToEdit = nil
-                        showAddCommandSheet = true
+                        activeSheet = .newCommand
                     } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
         }
-        .sheet(isPresented: $showAddCommandSheet) {
-            AddCommandView(
-                commandToEdit: commandToEdit,
-                onDismiss: {
-                    showAddCommandSheet = false
-                    commandToEdit = nil
-                },
-                onSave: {
-                    refreshCommandsID += 1
-                }
-            )
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .newCommand:
+                AddCommandView(
+                    commandToEdit: nil,
+                    onDismiss: { activeSheet = nil },
+                    onSave: { refreshCommandsID += 1 }
+                )
+            case .editCommand(let item):
+                AddCommandView(
+                    commandToEdit: item,
+                    onDismiss: { activeSheet = nil },
+                    onSave: { refreshCommandsID += 1 }
+                )
+            }
         }
         .onAppear {
             bringWindowToFront()
