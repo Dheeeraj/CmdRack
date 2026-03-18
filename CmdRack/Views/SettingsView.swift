@@ -430,6 +430,8 @@ struct SettingsView: View {
             ShortcutKeysSheetView(
                 title: "Pinned shortcuts",
                 keys: $editPinnedKeys,
+                settings: settings,
+                group: .pinned,
                 onDismiss: {
                     showPinnedShortcutsSheet = false
                     if editPinnedKeys.count == 10 {
@@ -445,6 +447,8 @@ struct SettingsView: View {
             ShortcutKeysSheetView(
                 title: "Recent shortcuts",
                 keys: $editRecentKeys,
+                settings: settings,
+                group: .recent,
                 onDismiss: {
                     showRecentShortcutsSheet = false
                     if editRecentKeys.count == 10 {
@@ -459,6 +463,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showSearchShortcutsSheet) {
             SearchResultShortcutKeysSheetView(
                 keys: $editSearchKeys,
+                settings: settings,
                 onDismiss: {
                     showSearchShortcutsSheet = false
                     if editSearchKeys.count == 2 {
@@ -729,11 +734,63 @@ private struct ImportConfirmationSheet: View {
     }
 }
 
+// MARK: - Shortcut conflict toast
+
+private struct ShortcutConflictToast: View {
+    let message: String
+    var onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.orange)
+
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            Spacer(minLength: 4)
+
+            Button {
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(.orange.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(.orange.opacity(0.3), lineWidth: 1)
+                )
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+}
+
 // MARK: - Shortcut keys editor sheet
 private struct ShortcutKeysSheetView: View {
     let title: String
     @Binding var keys: [String]
+    var settings: AppSettings
+    var group: AppSettings.ShortcutGroup
     var onDismiss: () -> Void
+
+    @State private var conflictMessage: String?
+    @State private var dismissTask: DispatchWorkItem?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -746,33 +803,71 @@ private struct ShortcutKeysSheetView: View {
             }
             .padding()
             Divider()
+
+            if let msg = conflictMessage {
+                ShortcutConflictToast(message: msg) {
+                    clearConflict()
+                }
+            }
+
             List {
                 ForEach(0..<10, id: \.self) { i in
                     HStack {
                         Text("Slot \(i + 1)")
                             .frame(width: 50, alignment: .leading)
-                        SingleKeyRecorderView(key: Binding(
-                            get: { keys.indices.contains(i) ? keys[i] : "" },
-                            set: { newVal in
-                                var copy = keys
-                                while copy.count <= i { copy.append("") }
-                                copy[i] = newVal
-                                keys = copy
+                        SingleKeyRecorderView(
+                            key: Binding(
+                                get: { keys.indices.contains(i) ? keys[i] : "" },
+                                set: { newVal in
+                                    var copy = keys
+                                    while copy.count <= i { copy.append("") }
+                                    copy[i] = newVal
+                                    keys = copy
+                                }
+                            ),
+                            conflictCheck: { key in
+                                for (idx, existing) in keys.enumerated() where idx != i {
+                                    if existing.lowercased() == key.lowercased() {
+                                        return "\"\(key)\" is already used in slot \(idx + 1) of this group."
+                                    }
+                                }
+                                return settings.conflictDescription(for: key, excluding: group)
+                            },
+                            onConflict: { message in
+                                showConflict(message)
                             }
-                        ))
+                        )
                     }
                 }
             }
             .listStyle(.inset)
         }
         .frame(minWidth: 280, minHeight: 340)
+        .animation(.easeInOut(duration: 0.25), value: conflictMessage != nil)
+    }
+
+    private func showConflict(_ message: String) {
+        dismissTask?.cancel()
+        withAnimation { conflictMessage = message }
+        let task = DispatchWorkItem { clearConflict() }
+        dismissTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5, execute: task)
+    }
+
+    private func clearConflict() {
+        dismissTask?.cancel()
+        withAnimation { conflictMessage = nil }
     }
 }
 
 // MARK: - Search result shortcut keys editor (special keys only)
 private struct SearchResultShortcutKeysSheetView: View {
     @Binding var keys: [String]
+    var settings: AppSettings
     var onDismiss: () -> Void
+
+    @State private var conflictMessage: String?
+    @State private var dismissTask: DispatchWorkItem?
 
     static func summary(for keys: [String]) -> String {
         let safe = (keys.count == 2) ? keys : ["z", "x"]
@@ -799,6 +894,12 @@ private struct SearchResultShortcutKeysSheetView: View {
 
             Divider()
 
+            if let msg = conflictMessage {
+                ShortcutConflictToast(message: msg) {
+                    clearConflict()
+                }
+            }
+
             VStack(alignment: .leading, spacing: 12) {
                 Text("These apply to the first two search results in the popup. Press the key to instantly copy (no modifiers).")
                     .font(.caption)
@@ -808,14 +909,26 @@ private struct SearchResultShortcutKeysSheetView: View {
                     HStack(spacing: 12) {
                         Text("Result \(i + 1)")
                             .frame(width: 70, alignment: .leading)
-                        SingleKeyRecorderView(key: Binding(
-                            get: { safeKeys.wrappedValue[i] },
-                            set: { newVal in
-                                var copy = safeKeys.wrappedValue
-                                copy[i] = newVal
-                                safeKeys.wrappedValue = copy
+                        SingleKeyRecorderView(
+                            key: Binding(
+                                get: { safeKeys.wrappedValue[i] },
+                                set: { newVal in
+                                    var copy = safeKeys.wrappedValue
+                                    copy[i] = newVal
+                                    safeKeys.wrappedValue = copy
+                                }
+                            ),
+                            conflictCheck: { key in
+                                let otherIdx = i == 0 ? 1 : 0
+                                if safeKeys.wrappedValue[otherIdx].lowercased() == key.lowercased() {
+                                    return "\"\(key)\" is already used in slot \(otherIdx + 1) of this group."
+                                }
+                                return settings.conflictDescription(for: key, excluding: .search)
+                            },
+                            onConflict: { message in
+                                showConflict(message)
                             }
-                        ))
+                        )
 
                         Spacer()
                     }
@@ -826,6 +939,20 @@ private struct SearchResultShortcutKeysSheetView: View {
             Spacer()
         }
         .frame(minWidth: 420, minHeight: 240)
+        .animation(.easeInOut(duration: 0.25), value: conflictMessage != nil)
+    }
+
+    private func showConflict(_ message: String) {
+        dismissTask?.cancel()
+        withAnimation { conflictMessage = message }
+        let task = DispatchWorkItem { clearConflict() }
+        dismissTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5, execute: task)
+    }
+
+    private func clearConflict() {
+        dismissTask?.cancel()
+        withAnimation { conflictMessage = nil }
     }
 }
 

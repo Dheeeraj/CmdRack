@@ -65,6 +65,32 @@ struct AppSettings: Codable, Equatable {
     /// Keys reserved by the app for fixed actions (Add Command, Manage, Quit, Tab).
     static let reservedKeys: Set<String> = ["=", "m", "⌫"]
 
+    // MARK: - Shortcut groups
+
+    enum ShortcutGroup { case pinned, recent, search }
+
+    /// Returns a conflict description if `key` is already assigned in another group or is reserved.
+    /// Pass the group currently being edited so keys within that group are skipped.
+    func conflictDescription(for key: String, excluding group: ShortcutGroup) -> String? {
+        let k = key.lowercased()
+
+        if Self.reservedKeys.contains(k) {
+            return "\"\(key)\" is reserved by the app."
+        }
+
+        if group != .pinned, let idx = pinnedShortcutKeys.firstIndex(where: { $0.lowercased() == k }) {
+            return "\"\(key)\" is already used by Pinned shortcuts (slot \(idx + 1))."
+        }
+        if group != .recent, let idx = recentShortcutKeys.firstIndex(where: { $0.lowercased() == k }) {
+            return "\"\(key)\" is already used by Recent shortcuts (slot \(idx + 1))."
+        }
+        if group != .search, let idx = searchResultShortcutKeys.firstIndex(where: { $0.lowercased() == k }) {
+            return "\"\(key)\" is already used by Search result shortcuts (slot \(idx + 1))."
+        }
+
+        return nil
+    }
+
     // MARK: - Validation
 
     var validated: AppSettings {
