@@ -19,10 +19,12 @@ struct SettingsView: View {
     // Backup / Restore
     @State private var isExporting = false
     @State private var isImporting = false
-    @State private var showImportModeAlert = false
     @State private var pendingImportData: Data?
+    @State private var pendingImportMeta: BackupMetadata?
     @State private var backupResultMessage: String?
     @State private var backupErrorMessage: String?
+
+    // Shortcut editors
     @State private var showPinnedShortcutsSheet = false
     @State private var showRecentShortcutsSheet = false
     @State private var editPinnedKeys: [String] = []
@@ -39,6 +41,20 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Form {
+
+                // ── 1. General ──────────────────────────────────────
+                Section {
+                    SettingsStyleRow(
+                        title: "Version",
+                        subtitle: "1.0",
+                        showChevron: false,
+                        action: nil
+                    )
+                } header: {
+                    Text("General")
+                }
+
+                // ── 2. Shortcuts ────────────────────────────────────
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Global shortcut")
@@ -92,6 +108,7 @@ struct SettingsView: View {
                     Text("Shortcuts")
                 }
 
+                // ── 3. Menu bar options ─────────────────────────────
                 Section {
                     HStack {
                         Text("Pinned commands shown")
@@ -183,6 +200,7 @@ struct SettingsView: View {
                     Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder. Shortcuts default to 1–0 for pinned and q–p for recent.")
                 }
 
+                // ── 4. Command limits ───────────────────────────────
                 Section {
                     HStack {
                         Text("Max text length")
@@ -225,19 +243,83 @@ struct SettingsView: View {
                     Text("These limits apply when creating or editing commands. Upper bound is capped to SQLite TEXT max (\(AppSettings.sqliteTextMax)). These settings sync via backup/restore.")
                 }
 
+                // ── 5. Backup & Restore ─────────────────────────────
                 Section {
-                    Toggle("Force-unlock Activity tab (debug)", isOn: $settings.debugUnlockActivityTab)
+                    // --- Export ---
+                    Button {
+                        exportBackup()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.up.doc")
+                                .font(.body)
+                                .foregroundStyle(.blue)
+                                .frame(width: 24, alignment: .center)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Create Snapshot")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Save all commands, settings, and activity to a compressed .cmdrack file.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            if isExporting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isExporting)
+
+                    // --- Import ---
+                    Button {
+                        chooseImportFile()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.down.doc")
+                                .font(.body)
+                                .foregroundStyle(.green)
+                                .frame(width: 24, alignment: .center)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Restore from Snapshot")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Open a .cmdrack file to restore data on this Mac.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            if isImporting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isImporting)
                 } header: {
-                    Text("Debug")
+                    Text("Backup & Restore")
                 } footer: {
-                    Text("For development only. When enabled, the Activity tab is available immediately without waiting 3 days after first install.")
+                    Text("Snapshots are compressed and use the .cmdrack extension. Share the file across Macs to migrate your setup.")
                 }
 
+                // ── 6. Data management ──────────────────────────────
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Commands storage")
+                        Text("Local storage")
                             .font(.subheadline.weight(.medium))
-                        Text("Commands are stored locally in Application Support/CmdRack and never leave your Mac.")
+                        Text("All data is stored locally in Application Support/CmdRack and never leaves your Mac unless you export a snapshot.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -253,58 +335,13 @@ struct SettingsView: View {
                     Text("Data")
                 }
 
+                // ── 7. Debug ────────────────────────────────────────
                 Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Backup & Restore")
-                            .font(.subheadline.weight(.medium))
-                        Text("Export all commands, settings, analytics, and pinned order to a single .cmdrack file. Import on any Mac to restore your setup.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-
-                    Button {
-                        exportBackup()
-                    } label: {
-                        HStack {
-                            Label("Export Backup", systemImage: "square.and.arrow.up")
-                            Spacer()
-                            if isExporting {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
-                    }
-                    .disabled(isExporting)
-
-                    Button {
-                        importBackup()
-                    } label: {
-                        HStack {
-                            Label("Import Backup", systemImage: "square.and.arrow.down")
-                            Spacer()
-                            if isImporting {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
-                    }
-                    .disabled(isImporting)
+                    Toggle("Force-unlock Activity tab (debug)", isOn: $settings.debugUnlockActivityTab)
                 } header: {
-                    Text("Backup & Restore")
+                    Text("Debug")
                 } footer: {
-                    Text("Export creates a .cmdrack file containing everything. Import lets you merge (keep existing + add new) or replace (overwrite all data).")
-                }
-
-                Section {
-                    SettingsStyleRow(
-                        title: "Version",
-                        subtitle: "1.0",
-                        showChevron: false,
-                        action: nil
-                    )
-                } header: {
-                    Text("General")
+                    Text("For development only. When enabled, the Activity tab is available immediately without waiting 3 days after first install.")
                 }
 
             }
@@ -322,6 +359,9 @@ struct SettingsView: View {
         .onChange(of: settings) { _, newValue in
             newValue.save()
         }
+
+        // MARK: - Alerts
+
         .alert("Clear all commands?", isPresented: $showClearDataConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Clear all", role: .destructive) {
@@ -338,6 +378,25 @@ struct SettingsView: View {
         } message: {
             Text(clearDataError ?? "")
         }
+        .alert("Snapshot Saved", isPresented: Binding(
+            get: { backupResultMessage != nil },
+            set: { if !$0 { backupResultMessage = nil } }
+        )) {
+            Button("Done") { backupResultMessage = nil }
+        } message: {
+            Text(backupResultMessage ?? "")
+        }
+        .alert("Something went wrong", isPresented: Binding(
+            get: { backupErrorMessage != nil },
+            set: { if !$0 { backupErrorMessage = nil } }
+        )) {
+            Button("OK") { backupErrorMessage = nil }
+        } message: {
+            Text(backupErrorMessage ?? "")
+        }
+
+        // MARK: - Sheets
+
         .sheet(isPresented: $showPinnedShortcutsSheet) {
             ShortcutKeysSheetView(
                 title: "Pinned shortcuts",
@@ -368,39 +427,22 @@ struct SettingsView: View {
                 }
             )
         }
-        // Backup result
-        .alert("Backup", isPresented: Binding(
-            get: { backupResultMessage != nil },
-            set: { if !$0 { backupResultMessage = nil } }
-        )) {
-            Button("OK") { backupResultMessage = nil }
-        } message: {
-            Text(backupResultMessage ?? "")
-        }
-        // Backup error
-        .alert("Backup Error", isPresented: Binding(
-            get: { backupErrorMessage != nil },
-            set: { if !$0 { backupErrorMessage = nil } }
-        )) {
-            Button("OK") { backupErrorMessage = nil }
-        } message: {
-            Text(backupErrorMessage ?? "")
-        }
-        // Import mode chooser
-        .alert("Import Mode", isPresented: $showImportModeAlert) {
-            Button("Merge") {
-                performImport(mode: .merge)
-            }
-            Button("Replace", role: .destructive) {
-                performImport(mode: .replace)
-            }
-            Button("Cancel", role: .cancel) {
-                pendingImportData = nil
-            }
-        } message: {
-            Text("Merge keeps your existing data and adds new items. Replace deletes everything first and restores from the backup file.")
+        .sheet(item: $pendingImportMeta) { meta in
+            ImportConfirmationSheet(
+                metadata: meta,
+                onImport: { mode in
+                    pendingImportMeta = nil
+                    performImport(mode: mode)
+                },
+                onCancel: {
+                    pendingImportMeta = nil
+                    pendingImportData = nil
+                }
+            )
         }
     }
+
+    // MARK: - Helpers
 
     private func clearAllCommands() {
         let repo = CommandRepository()
@@ -437,48 +479,63 @@ struct SettingsView: View {
 
     private func presentSavePanel(data: Data) {
         let panel = NSSavePanel()
-        panel.title = "Export CmdRack Backup"
-        panel.nameFieldStringValue = "CmdRack-Backup.cmdrack"
-        panel.allowedContentTypes = [.json]
+        panel.title = "Save CmdRack Snapshot"
+        panel.message = "Choose where to save your backup snapshot."
+        panel.nameFieldStringValue = BackupService.defaultFileName
+        panel.allowedContentTypes = [.data]          // .cmdrack is arbitrary binary
+        panel.allowsOtherFileTypes = false
         panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
+        // Ensure the .cmdrack extension
+        var finalURL = url
+        if finalURL.pathExtension != BackupService.fileExtension {
+            finalURL = finalURL.deletingPathExtension().appendingPathExtension(BackupService.fileExtension)
+        }
+
         do {
-            try data.write(to: url, options: .atomic)
-            backupResultMessage = "Backup exported successfully."
+            try data.write(to: finalURL, options: .atomic)
+            let sizeKB = data.count / 1024
+            backupResultMessage = "Snapshot saved to \(finalURL.lastPathComponent) (\(sizeKB) KB)."
         } catch {
-            backupErrorMessage = "Failed to write file: \(error.localizedDescription)"
+            backupErrorMessage = "Failed to save file: \(error.localizedDescription)"
         }
     }
 
     // MARK: - Import
 
-    private func importBackup() {
+    private func chooseImportFile() {
         let panel = NSOpenPanel()
-        panel.title = "Import CmdRack Backup"
-        panel.allowedContentTypes = [.json]
+        panel.title = "Open CmdRack Snapshot"
+        panel.message = "Select a .cmdrack backup file to restore."
+        panel.allowedContentTypes = [.data]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
+        // Soft-check extension
+        if url.pathExtension.lowercased() != BackupService.fileExtension {
+            backupErrorMessage = "Please select a file with the .\(BackupService.fileExtension) extension."
+            return
+        }
+
         do {
             let data = try Data(contentsOf: url)
-            // Validate that it decodes before asking for mode
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            _ = try decoder.decode(CmdRackBackup.self, from: data)
+            let meta = try BackupService.peekMetadata(from: data)
             pendingImportData = data
-            showImportModeAlert = true
+            pendingImportMeta = meta
         } catch {
-            backupErrorMessage = "Could not read backup file: \(error.localizedDescription)"
+            backupErrorMessage = error.localizedDescription
         }
     }
 
     private func performImport(mode: BackupImportMode) {
         guard let data = pendingImportData else { return }
         pendingImportData = nil
+        pendingImportMeta = nil
         isImporting = true
 
         DispatchQueue.global(qos: .userInitiated).async {
@@ -486,8 +543,8 @@ struct SettingsView: View {
                 let result = try BackupService.importBackup(from: data, mode: mode)
                 DispatchQueue.main.async {
                     isImporting = false
-                    settings = AppSettings.load() // refresh settings UI
-                    backupResultMessage = "Import complete — \(result.commandsImported) commands added, settings restored."
+                    settings = AppSettings.load()
+                    backupResultMessage = result.summary
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -495,6 +552,136 @@ struct SettingsView: View {
                     backupErrorMessage = error.localizedDescription
                 }
             }
+        }
+    }
+}
+
+// MARK: - Import Confirmation Sheet
+
+private struct ImportConfirmationSheet: View {
+    let metadata: BackupMetadata
+    let onImport: (BackupImportMode) -> Void
+    let onCancel: () -> Void
+
+    @State private var selectedMode: BackupImportMode = .merge
+
+    private var formattedDate: String {
+        let fmt = DateFormatter()
+        fmt.dateStyle = .long
+        fmt.timeStyle = .short
+        return fmt.string(from: metadata.exportedAt)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+
+            // Header
+            VStack(spacing: 8) {
+                Image(systemName: "arrow.down.doc.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.blue)
+
+                Text("Restore from Snapshot")
+                    .font(.headline)
+            }
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+
+            // Backup info card
+            VStack(alignment: .leading, spacing: 8) {
+                metadataRow(icon: "desktopcomputer", label: "Source", value: metadata.deviceName)
+                metadataRow(icon: "calendar", label: "Created", value: formattedDate)
+                metadataRow(icon: "terminal", label: "Commands", value: "\(metadata.commandCount)")
+                metadataRow(icon: "chart.bar", label: "Analytics events", value: "\(metadata.analyticsCount)")
+            }
+            .padding(12)
+            .background(.quaternary.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 20)
+
+            // Import mode picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Import mode")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.top, 16)
+
+                ForEach(BackupImportMode.allCases, id: \.self) { mode in
+                    Button {
+                        selectedMode = mode
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: selectedMode == mode ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selectedMode == mode ? .blue : .secondary)
+                                .font(.body)
+                            Image(systemName: mode.icon)
+                                .foregroundStyle(mode == .replace ? .orange : .blue)
+                                .frame(width: 20, alignment: .center)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                Text(mode.subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                        }
+                        .padding(8)
+                        .background(selectedMode == mode ? Color.accentColor.opacity(0.08) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            if selectedMode == .replace {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                    Text("Replace will permanently delete all existing data before restoring.")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+            }
+
+            Spacer()
+
+            // Action buttons
+            Divider()
+            HStack {
+                Button("Cancel") { onCancel() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(selectedMode == .replace ? "Replace & Restore" : "Merge & Restore") {
+                    onImport(selectedMode)
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .tint(selectedMode == .replace ? .orange : .blue)
+            }
+            .padding(16)
+        }
+        .frame(width: 420, height: 480)
+    }
+
+    private func metadataRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 16, alignment: .center)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 110, alignment: .leading)
+            Text(value)
+                .font(.caption.weight(.medium))
+            Spacer()
         }
     }
 }
