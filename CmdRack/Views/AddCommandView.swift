@@ -22,176 +22,27 @@ struct AddCommandView: View {
     @State private var isSaving = false
     @State private var showDeleteConfirm = false
     @State private var settings = AppSettings.load()
+    @State private var appeared = false
+
+    @FocusState private var focusedField: FormField?
+
+    private enum FormField: Hashable {
+        case title, command, project, tool, tag
+    }
 
     private let repository = CommandRepository()
     private var isEditMode: Bool { commandToEdit != nil }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(isEditMode ? "Edit Command" : "New Command")
-                        .font(.title3.weight(.semibold))
-                    Text(isEditMode ? "Update an existing command" : "Save a command for quick access")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Pin this")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Toggle("", isOn: $pinned)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .labelsHidden()
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
-
+            headerSection
             Divider()
-
-            // Bento grid
-            ScrollView {
-                VStack(spacing: 12) {
-                    // Row 1: Title + Command (single container)
-                    bentoCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                fieldLabel("Title", required: true)
-                                TextField("e.g. Summon coffee", text: $title)
-                                    .textFieldStyle(.roundedBorder)
-                                    .onChange(of: title) { title = String(title.prefix(settings.commandTextMax)) }
-                                charCounter(title.count, max: settings.commandTextMax)
-                            }
-
-                            Divider().opacity(0.25)
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                fieldLabel("Command", required: true)
-                                TextField("e.g. Brew coffee", text: $command)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(.body, design: .monospaced))
-                                    .onChange(of: command) { command = String(command.prefix(settings.commandTextMax)) }
-                                charCounter(command.count, max: settings.commandTextMax)
-                            }
-                        }
-                    }
-
-                    // Row 3: Project + Tool (side by side)
-                    HStack(spacing: 12) {
-                        bentoCard {
-                            fieldLabel("Project Name")
-                            TextField("e.g. Operation ‘No Bugs’", text: $project)
-                                .textFieldStyle(.roundedBorder)
-                                .onChange(of: project) { project = String(project.prefix(settings.commandTextMax)) }
-                        }
-                        bentoCard {
-                            fieldLabel("Tool")
-                            TextField("e.g. docker, git...", text: $tool)
-                                .textFieldStyle(.roundedBorder)
-                                .onChange(of: tool) { tool = String(tool.prefix(settings.commandTextMax)) }
-                        }
-                    }
-
-                    // Row 4: Tags (full width)
-                    bentoCard {
-                        HStack {
-                            fieldLabel("Tags")
-                            Spacer()
-                            Text("\(tags.count)/\(settings.tagMaxCount)")
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(tags.count >= settings.tagMaxCount ? Color.red : Color.secondary.opacity(0.5))
-                        }
-
-                        HStack(spacing: 6) {
-                            TextField("Add a tag...", text: $tagInput)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit { commitTag() }
-                                .onChange(of: tagInput) { tagInput = String(tagInput.prefix(settings.tagTextMax)) }
-
-                            Button(action: commitTag) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.body)
-                                    .foregroundStyle(
-                                        canAddTag ? Color.accentColor : Color.secondary.opacity(0.5)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(!canAddTag)
-                        }
-
-                        if !tags.isEmpty {
-                            TagCloudView(tags: tags) { removeTag($0) }
-                        }
-                    }
-
-                    // Metadata info (edit mode only, collapsible)
-                    if let item = commandToEdit {
-                        metadataSection(item)
-                    }
-                }
-                .padding(16)
-            }
-
-            // Validation errors
-            if !errors.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(errors, id: \.self) { err in
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.caption2)
-                            Text(err)
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.red)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(Color.red.opacity(0.06))
-            }
-
+            formContent
+            if !errors.isEmpty { errorBanner }
             Divider()
-
-            // Footer
-            HStack(spacing: 10) {
-                Button("Cancel") {
-                    if let onDismiss {
-                        onDismiss()
-                    } else {
-                        closeWindow()
-                    }
-                }
-                .keyboardShortcut(.cancelAction)
-
-                if isEditMode {
-                    Button(role: .destructive) {
-                        showDeleteConfirm = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                }
-
-                Spacer()
-
-                Button(isEditMode ? "Update" : "Save Command") {
-                    saveCommand()
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .disabled(isSaving)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            footerSection
         }
-        .frame(width: 460)
+        .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
         .alert("Delete Command?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) { deleteCommand() }
@@ -205,6 +56,12 @@ struct AddCommandView: View {
             if commandToEdit == nil && onDismiss == nil {
                 bringWindowToFront()
             }
+            withAnimation(.easeOut(duration: 0.35).delay(0.05)) {
+                appeared = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                focusedField = .title
+            }
         }
         .onChange(of: commandToEdit?.id) { _, _ in
             applyCommandToEdit()
@@ -213,6 +70,296 @@ struct AddCommandView: View {
             settings = AppSettings.load()
         }
     }
+
+    // MARK: - Header
+
+    private var headerSection: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isEditMode ? "Edit Command" : "New Command")
+                    .font(.title3.weight(.semibold))
+                Text(isEditMode ? "Modify your saved command" : "Save a command for quick access")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            // Pin toggle
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    pinned.toggle()
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: pinned ? "pin.fill" : "pin")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(pinned ? Color.orange : .secondary)
+                        .rotationEffect(.degrees(pinned ? 0 : 45))
+                    Text(pinned ? "Pinned" : "Pin")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(pinned ? Color.orange : .secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(pinned ? Color.orange.opacity(0.12) : Color.primary.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(pinned ? Color.orange.opacity(0.25) : Color.primary.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Form Content
+
+    private var formContent: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // ── Title & Command ──────────────────────────
+                cardContainer {
+                    VStack(spacing: 0) {
+                        fieldRow(
+                            label: "Title",
+                            placeholder: "Give your command a name",
+                            text: $title,
+                            field: .title,
+                            maxChars: settings.commandTextMax,
+                            required: true
+                        )
+
+                        Divider().padding(.horizontal, 14)
+
+                        fieldRow(
+                            label: "Command",
+                            placeholder: "The command to run",
+                            text: $command,
+                            field: .command,
+                            maxChars: settings.commandTextMax,
+                            required: true,
+                            monospaced: true
+                        )
+                    }
+                }
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 6)
+
+                // ── Project & Tool ──────────────────────────
+                HStack(spacing: 12) {
+                    cardContainer {
+                        fieldRow(
+                            label: "Project",
+                            placeholder: "Project name",
+                            text: $project,
+                            field: .project,
+                            maxChars: settings.commandTextMax
+                        )
+                    }
+
+                    cardContainer {
+                        fieldRow(
+                            label: "Tool",
+                            placeholder: "docker, git…",
+                            text: $tool,
+                            field: .tool,
+                            maxChars: settings.commandTextMax
+                        )
+                    }
+                }
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 6)
+
+                // ── Tags ──────────────────────────
+                cardContainer {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Tag input row
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 4) {
+                                    Text("Tags")
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(tags.count)/\(settings.tagMaxCount)")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundColor(tags.count >= settings.tagMaxCount ? .red : .secondary.opacity(0.4))
+                                }
+
+                                TextField("Add tags, comma separated…", text: $tagInput)
+                                    .textFieldStyle(.plain)
+                                    .font(.subheadline)
+                                    .focused($focusedField, equals: .tag)
+                                    .onSubmit { commitTag() }
+                                    .onChange(of: tagInput) { tagInput = String(tagInput.prefix(settings.tagTextMax)) }
+                            }
+
+                            Button(action: commitTag) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(canAddTag ? Color.accentColor : Color.secondary.opacity(0.25))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!canAddTag)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+
+                        if !tags.isEmpty {
+                            Divider().padding(.horizontal, 14)
+
+                            TagCloudView(tags: tags) { removeTag($0) }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .transition(.opacity)
+                        }
+                    }
+                }
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 6)
+
+                // ── Metadata (edit mode) ──────────────────────────
+                if let item = commandToEdit {
+                    metadataSection(item)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 6)
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    // MARK: - Card Container
+
+    private func cardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+            )
+    }
+
+    // MARK: - Field Row
+
+    private func fieldRow(
+        label: String,
+        placeholder: String,
+        text: Binding<String>,
+        field: FormField,
+        maxChars: Int,
+        required: Bool = false,
+        monospaced: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                if required {
+                    Text("*")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.red.opacity(0.7))
+                }
+                Spacer()
+                if focusedField == field && !text.wrappedValue.isEmpty {
+                    Text("\(text.wrappedValue.count)/\(maxChars)")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(text.wrappedValue.count >= maxChars ? .red : .secondary.opacity(0.3))
+                        .transition(.opacity)
+                }
+            }
+
+            TextField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .font(monospaced ? .system(.subheadline, design: .monospaced) : .subheadline)
+                .focused($focusedField, equals: field)
+                .onChange(of: text.wrappedValue) { text.wrappedValue = String(text.wrappedValue.prefix(maxChars)) }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = field }
+    }
+
+    // MARK: - Error Banner
+
+    private var errorBanner: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(errors, id: \.self) { err in
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 5, height: 5)
+                    Text(err)
+                        .font(.caption)
+                }
+                .foregroundStyle(.red)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(Color.red.opacity(0.06))
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+
+    // MARK: - Footer
+
+    private var footerSection: some View {
+        HStack(spacing: 10) {
+            Button("Cancel") {
+                if let onDismiss {
+                    onDismiss()
+                } else {
+                    closeWindow()
+                }
+            }
+            .keyboardShortcut(.cancelAction)
+
+            if isEditMode {
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+            }
+
+            Spacer()
+
+            Button {
+                saveCommand()
+            } label: {
+                HStack(spacing: 5) {
+                    if isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(isEditMode ? "Update" : "Save Command")
+                }
+            }
+            .keyboardShortcut(.defaultAction)
+            .buttonStyle(.borderedProminent)
+            .disabled(isSaving || title.trimmingCharacters(in: .whitespaces).isEmpty || command.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+
+    // MARK: - Data
 
     private func applyCommandToEdit() {
         if let item = commandToEdit {
@@ -223,7 +370,6 @@ struct AddCommandView: View {
             tags = item.tags
             pinned = item.pinned
         } else {
-            // New command
             title = ""
             command = ""
             project = ""
@@ -233,42 +379,6 @@ struct AddCommandView: View {
             pinned = false
             errors = []
         }
-    }
-
-    // MARK: - Bento card
-
-    private func bentoCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            content()
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private func fieldLabel(_ text: String, required: Bool = false) -> some View {
-        HStack(spacing: 2) {
-            Text(text)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.secondary)
-            if required {
-                Text("*")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-        }
-    }
-
-    private func charCounter(_ count: Int, max: Int) -> some View {
-        Text("\(count)/\(max)")
-            .font(.system(.caption2, design: .monospaced))
-            .foregroundStyle(count >= max ? Color.red : Color.secondary.opacity(0.5))
-            .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     // MARK: - Tag management
@@ -285,12 +395,16 @@ struct AddCommandView: View {
             .filter { !$0.isEmpty && !tags.contains($0) }
 
         let remaining = settings.tagMaxCount - tags.count
-        tags.append(contentsOf: newTags.prefix(remaining))
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            tags.append(contentsOf: newTags.prefix(remaining))
+        }
         tagInput = ""
     }
 
     private func removeTag(_ tag: String) {
-        tags.removeAll { $0 == tag }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            tags.removeAll { $0 == tag }
+        }
     }
 
     // MARK: - Validation
@@ -324,61 +438,52 @@ struct AddCommandView: View {
         return errs
     }
 
-    // MARK: - Metadata display (macOS Settings style)
+    // MARK: - Metadata display
 
     @State private var showInfo = false
 
     private func metadataSection(_ item: CommandItem) -> some View {
-        VStack(spacing: 0) {
-            // Header row (always visible) — looks like a Settings row
-            SettingsStyleRow(
-                title: "Info",
-                subtitle: infoSubtitle(item),
-                chevronRotated: showInfo,
-                showChevron: true,
-                action: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showInfo.toggle()
+        cardContainer {
+            VStack(spacing: 0) {
+                SettingsStyleRow(
+                    title: "Info",
+                    subtitle: infoSubtitle(item),
+                    chevronRotated: showInfo,
+                    showChevron: true,
+                    action: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showInfo.toggle()
+                        }
                     }
+                )
+
+                if showInfo {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let created = item.metadata.first(where: { $0.type == .create }) {
+                            metadataDetailRow("Created", date: formatMetadataDate(created.createdUTC), device: created.device)
+                        } else {
+                            metadataDetailRow("Created", date: formatDate(item.createdAt), device: nil)
+                        }
+
+                        if let lastUpdate = item.metadata.last(where: { $0.type == .update }) {
+                            metadataDetailRow("Last updated", date: formatMetadataDate(lastUpdate.createdUTC), device: lastUpdate.device)
+                        } else if item.updatedAt != item.createdAt {
+                            metadataDetailRow("Last updated", date: formatDate(item.updatedAt), device: nil)
+                        }
+
+                        let edits = item.metadata.filter { $0.type == .update }.count
+                        if edits > 0 {
+                            metadataDetailRow("Total edits", date: "\(edits)", device: nil)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-            )
-
-            // Expanded detail
-            if showInfo {
-                Divider()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    if let created = item.metadata.first(where: { $0.type == .create }) {
-                        metadataDetailRow("Created", date: formatMetadataDate(created.createdUTC), device: created.device)
-                    } else {
-                        metadataDetailRow("Created", date: formatDate(item.createdAt), device: nil)
-                    }
-
-                    if let lastUpdate = item.metadata.last(where: { $0.type == .update }) {
-                        metadataDetailRow("Last updated", date: formatMetadataDate(lastUpdate.createdUTC), device: lastUpdate.device)
-                    } else if item.updatedAt != item.createdAt {
-                        metadataDetailRow("Last updated", date: formatDate(item.updatedAt), device: nil)
-                    }
-
-                    let edits = item.metadata.filter { $0.type == .update }.count
-                    if edits > 0 {
-                        metadataDetailRow("Total edits", date: "\(edits)", device: nil)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
     }
 
     private func infoSubtitle(_ item: CommandItem) -> String {
@@ -465,7 +570,9 @@ struct AddCommandView: View {
     }
 
     private func saveCommand() {
-        errors = validate()
+        withAnimation(.easeOut(duration: 0.2)) {
+            errors = validate()
+        }
         guard errors.isEmpty else { return }
 
         isSaving = true
@@ -515,7 +622,7 @@ struct AddCommandView: View {
     }
 }
 
-// MARK: - Tag Cloud (YouTube-style chips)
+// MARK: - Tag Cloud
 
 struct TagCloudView: View {
     let tags: [String]
@@ -534,6 +641,8 @@ struct TagChipView: View {
     let tag: String
     let onRemove: () -> Void
 
+    @State private var isHovering = false
+
     var body: some View {
         HStack(spacing: 4) {
             Text(tag)
@@ -543,16 +652,18 @@ struct TagChipView: View {
             Button(action: onRemove) {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isHovering ? .primary : .secondary)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.accentColor.opacity(0.12))
-        .foregroundStyle(Color.accentColor)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.primary.opacity(isHovering ? 0.10 : 0.06))
+        .foregroundStyle(.primary)
         .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 1))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: isHovering)
     }
 }
 
