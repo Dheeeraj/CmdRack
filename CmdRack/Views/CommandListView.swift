@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum CommandListTab: String, CaseIterable {
     case all = "All"
@@ -28,6 +29,10 @@ struct CommandListView: View {
     @State private var settings = AppSettings.load()
     @State private var pinnedWorking: [CommandItem] = []
     @State private var draggingPinnedItem: CommandItem?
+
+    // Share
+    @State private var shareResultMessage: String?
+    @State private var shareErrorMessage: String?
 
     private let repository = CommandRepository()
 
@@ -253,10 +258,29 @@ struct CommandListView: View {
                                 commandRow(item)
                             }
                         } header: {
-                            Text("\(groupName) (\(items.count))")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
+                            HStack {
+                                Text("\(groupName) (\(items.count))")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Button {
+                                    let label: String
+                                    switch selectedTab {
+                                    case .project: label = "Project: \(groupName)"
+                                    case .tool:    label = "Tool: \(groupName)"
+                                    case .tags:    label = "Tag: \(groupName)"
+                                    default:       label = groupName
+                                    }
+                                    beginShare(commands: items, label: label)
+                                } label: {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Share \(groupName) commands")
+                            }
                         }
                     }
                 }
@@ -325,6 +349,22 @@ struct CommandListView: View {
         } message: { item in
             Text("Are you sure you want to delete \"\(item.title)\"?")
         }
+        .alert("Shared", isPresented: Binding(
+            get: { shareResultMessage != nil },
+            set: { if !$0 { shareResultMessage = nil } }
+        )) {
+            Button("OK") { shareResultMessage = nil }
+        } message: {
+            Text(shareResultMessage ?? "")
+        }
+        .alert("Share failed", isPresented: Binding(
+            get: { shareErrorMessage != nil },
+            set: { if !$0 { shareErrorMessage = nil } }
+        )) {
+            Button("OK") { shareErrorMessage = nil }
+        } message: {
+            Text(shareErrorMessage ?? "")
+        }
     }
 
     private func commandSubtitle(_ item: CommandItem) -> String {
@@ -356,6 +396,12 @@ struct CommandListView: View {
                     onEdit(item)
                 }
             }
+            Button {
+                beginShare(commands: [item], label: item.title)
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            Divider()
             Button(role: .destructive) {
                 commandPendingDelete = item
                 showDeleteConfirmation = true
@@ -426,6 +472,40 @@ struct CommandListView: View {
             commandPendingDelete = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Share
+
+    /// Export commands directly — no intermediate sheet. Packs the commands,
+    /// opens an NSSavePanel, and writes the .cmds file.
+    private func beginShare(commands: [CommandItem], label: String) {
+        do {
+            let data = try BackupService.exportSharePack(
+                commands: commands,
+                filterDescription: label
+            )
+
+            let panel = NSSavePanel()
+            panel.title = "Save Shared Commands"
+            panel.nameFieldStringValue = BackupService.shareFileName(label: label)
+            panel.allowedContentTypes = [.data]
+            panel.allowsOtherFileTypes = false
+            panel.canCreateDirectories = true
+            panel.isExtensionHidden = false
+
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+
+            var finalURL = url
+            if finalURL.pathExtension != BackupService.shareExtension {
+                finalURL = finalURL.deletingPathExtension().appendingPathExtension(BackupService.shareExtension)
+            }
+
+            try data.write(to: finalURL, options: .atomic)
+            let sizeKB = max(1, data.count / 1024)
+            shareResultMessage = "Saved \(finalURL.lastPathComponent) (\(sizeKB) KB) — \(commands.count) command\(commands.count == 1 ? "" : "s")"
+        } catch {
+            shareErrorMessage = error.localizedDescription
         }
     }
 }

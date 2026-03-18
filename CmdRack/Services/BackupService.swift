@@ -111,11 +111,25 @@ enum BackupService {
     /// File extension for CmdRack backups (a compressed JSON archive).
     static let fileExtension = "cmdrack"
 
+    /// File extension for shareable command packs (no analytics).
+    static let shareExtension = "cmds"
+
     /// Date-stamped default filename, e.g. "CmdRack-2026-03-18.cmdrack"
     static var defaultFileName: String {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         return "CmdRack-\(fmt.string(from: Date())).\(fileExtension)"
+    }
+
+    /// Default filename for share packs, e.g. "Docker.cmds"
+    static func shareFileName(label: String) -> String {
+        let safe = label
+            .components(separatedBy: .alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
+            .prefix(40)
+        let name = safe.isEmpty ? "Commands" : String(safe)
+        return "\(name).\(shareExtension)"
     }
 
     // MARK: - JSON coding helpers
@@ -327,6 +341,102 @@ enum BackupService {
                 pinnedOrderRestored: !pinnedUUIDs.isEmpty,
                 recentCopiedRestored: !recentUUIDs.isEmpty
             )
+        } catch let error as BackupError {
+            throw error
+        } catch {
+            throw BackupError.importFailed(error)
+        }
+    }
+
+    // MARK: - Share Packs (commands only, no analytics)
+
+    /// Export a filtered set of commands as a shareable pack.
+    static func exportSharePack(commands: [CommandItem], filterDescription: String) throws -> Data {
+        let pack = CmdRackSharePack.pack(commands: commands, filterDescription: filterDescription)
+
+        guard let json = try? makeEncoder().encode(pack) else {
+            throw BackupError.encodingFailed
+        }
+
+        return try compress(json)
+    }
+
+    /// Lightweight metadata for share pack import confirmation.
+    struct SharePackMetadata: Identifiable {
+        let id = UUID()
+        let deviceName: String
+        let exportedAt: Date
+        let filterDescription: String
+        let commandCount: Int
+        let version: Int
+    }
+
+    /// Lightweight envelope for peeking at share pack metadata.
+    private struct SharePackEnvelope: Decodable {
+        let version: Int
+        let exportedAt: Date
+        let deviceName: String
+        let filterDescription: String
+        let commands: [BackupEnvelope.IgnoredItem]
+    }
+
+    /// Read metadata from a .cmds file for the import confirmation sheet.
+    static func peekShareMetadata(from data: Data) throws -> SharePackMetadata {
+        let json = try decompress(data)
+        let envelope = try makeDecoder().decode(SharePackEnvelope.self, from: json)
+        return SharePackMetadata(
+            deviceName: envelope.deviceName,
+            exportedAt: envelope.exportedAt,
+            filterDescription: envelope.filterDescription,
+            commandCount: envelope.commands.count,
+            version: envelope.version
+        )
+    }
+
+    /// Import a share pack, skipping commands whose `command` text already exists locally.
+    /// Returns the number of commands actually added.
+    @discardableResult
+    static func importSharePack(from compressedData: Data) throws -> Int {
+        let json: Data
+        do {
+            json = try decompress(compressedData)
+        } catch {
+            throw BackupError.decompressionFailed
+        }
+
+        let pack: CmdRackSharePack
+        do {
+            pack = try makeDecoder().decode(CmdRackSharePack.self, from: json)
+        } catch {
+            throw BackupError.decodingFailed(error)
+        }
+
+        guard pack.version <= CmdRackSharePack.currentVersion else {
+            throw BackupError.unsupportedVersion(pack.version)
+        }
+
+        let repo = CommandRepository()
+        guard DatabaseService.shared.isAvailable else { throw BackupError.databaseUnavailable }
+
+        do {
+            let existing = try repo.fetchAll()
+            let existingValues = Set(existing.map { $0.command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+
+            // Filter out commands whose value already exists locally, then assign new UUIDs
+            // so they don't collide with the sender's IDs.
+            let newCommands = pack.commands.compactMap { item -> CommandItem? in
+                let normalised = item.command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                guard !existingValues.contains(normalised) else { return nil }
+                var copy = item
+                copy.id = UUID()         // fresh ID for the recipient
+                copy.pinned = false      // don't auto-pin shared commands
+                return copy
+            }
+
+            guard !newCommands.isEmpty else { return 0 }
+
+            try repo.insertBatch(newCommands)
+            return newCommands.count
         } catch let error as BackupError {
             throw error
         } catch {
