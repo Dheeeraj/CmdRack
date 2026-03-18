@@ -139,13 +139,9 @@ struct RecentCommandsView: View {
     private func showCopiedToast() {
         showCopiedAlert = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            closeMenuBarWindow()
+            NotificationCenter.default.post(name: .cmdRackDismissPopover, object: nil)
             showCopiedAlert = false
         }
-    }
-
-    private func closeMenuBarWindow() {
-        NSApp.keyWindow?.close()
     }
 }
 

@@ -330,9 +330,9 @@ struct ContentView: View {
 
     private func showCopiedToast() {
         showCopiedAlert = true
-        // Close immediately — the window dismissal is the feedback
+        // Dismiss the popover directly — never use NSApp.keyWindow which can target the wrong window
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NSApp.keyWindow?.close()
+            NotificationCenter.default.post(name: .cmdRackDismissPopover, object: nil)
             showCopiedAlert = false
         }
     }

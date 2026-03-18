@@ -58,6 +58,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         setupPopover()
         setupGlobalShortcut()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(dismissPopover),
+            name: .cmdRackDismissPopover,
+            object: nil
+        )
+    }
+
+    @objc private func dismissPopover() {
+        if popover.isShown {
+            popover.performClose(nil)
+        }
     }
 
     private func setupStatusItem() {

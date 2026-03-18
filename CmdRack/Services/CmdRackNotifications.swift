@@ -20,5 +20,8 @@ extension Notification.Name {
 
     /// Posted to switch the manage window to the Commands list with the Pinned tab selected.
     static let cmdRackSwitchToPinnedTab = Notification.Name("CmdRackSwitchToPinnedTab")
+
+    /// Posted by views that want to dismiss the menu bar popover (instead of using NSApp.keyWindow?.close()).
+    static let cmdRackDismissPopover = Notification.Name("CmdRackDismissPopover")
 }
 
