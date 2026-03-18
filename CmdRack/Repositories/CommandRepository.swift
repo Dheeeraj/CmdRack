@@ -90,6 +90,24 @@ final class CommandRepository {
         }
     }
 
+    /// Batch-insert commands, silently skipping duplicates (by primary key).
+    /// Posts a single change notification after all inserts.
+    func insertBatch(_ commands: [CommandItem]) throws {
+        guard let queue = database.queue else {
+            throw CommandRepositoryError.databaseUnavailable
+        }
+        do {
+            try queue.write { db in
+                for command in commands {
+                    try command.insert(db, onConflict: .ignore)
+                }
+            }
+            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+        } catch {
+            throw CommandRepositoryError.databaseError(error)
+        }
+    }
+
     func fetchByProject(_ project: String) throws -> [CommandItem] {
         guard let queue = database.queue else {
             throw CommandRepositoryError.databaseUnavailable

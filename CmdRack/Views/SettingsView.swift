@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @StateObject private var shortcutService = GlobalShortcutService.shared
@@ -14,6 +15,14 @@ struct SettingsView: View {
     @State private var showClearDataConfirmation = false
     @State private var clearDataError: String?
     @State private var settings = AppSettings.load()
+
+    // Backup / Restore
+    @State private var isExporting = false
+    @State private var isImporting = false
+    @State private var showImportModeAlert = false
+    @State private var pendingImportData: Data?
+    @State private var backupResultMessage: String?
+    @State private var backupErrorMessage: String?
     @State private var showPinnedShortcutsSheet = false
     @State private var showRecentShortcutsSheet = false
     @State private var editPinnedKeys: [String] = []
@@ -245,6 +254,49 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Backup & Restore")
+                            .font(.subheadline.weight(.medium))
+                        Text("Export all commands, settings, analytics, and pinned order to a single .cmdrack file. Import on any Mac to restore your setup.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+
+                    Button {
+                        exportBackup()
+                    } label: {
+                        HStack {
+                            Label("Export Backup", systemImage: "square.and.arrow.up")
+                            Spacer()
+                            if isExporting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                    .disabled(isExporting)
+
+                    Button {
+                        importBackup()
+                    } label: {
+                        HStack {
+                            Label("Import Backup", systemImage: "square.and.arrow.down")
+                            Spacer()
+                            if isImporting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                    .disabled(isImporting)
+                } header: {
+                    Text("Backup & Restore")
+                } footer: {
+                    Text("Export creates a .cmdrack file containing everything. Import lets you merge (keep existing + add new) or replace (overwrite all data).")
+                }
+
+                Section {
                     SettingsStyleRow(
                         title: "Version",
                         subtitle: "1.0",
@@ -316,6 +368,38 @@ struct SettingsView: View {
                 }
             )
         }
+        // Backup result
+        .alert("Backup", isPresented: Binding(
+            get: { backupResultMessage != nil },
+            set: { if !$0 { backupResultMessage = nil } }
+        )) {
+            Button("OK") { backupResultMessage = nil }
+        } message: {
+            Text(backupResultMessage ?? "")
+        }
+        // Backup error
+        .alert("Backup Error", isPresented: Binding(
+            get: { backupErrorMessage != nil },
+            set: { if !$0 { backupErrorMessage = nil } }
+        )) {
+            Button("OK") { backupErrorMessage = nil }
+        } message: {
+            Text(backupErrorMessage ?? "")
+        }
+        // Import mode chooser
+        .alert("Import Mode", isPresented: $showImportModeAlert) {
+            Button("Merge") {
+                performImport(mode: .merge)
+            }
+            Button("Replace", role: .destructive) {
+                performImport(mode: .replace)
+            }
+            Button("Cancel", role: .cancel) {
+                pendingImportData = nil
+            }
+        } message: {
+            Text("Merge keeps your existing data and adds new items. Replace deletes everything first and restores from the backup file.")
+        }
     }
 
     private func clearAllCommands() {
@@ -329,6 +413,89 @@ struct SettingsView: View {
 
     private func checkPermission() {
         hasPermission = shortcutService.hasAccessibilityPermission
+    }
+
+    // MARK: - Export
+
+    private func exportBackup() {
+        isExporting = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let data = try BackupService.exportBackup()
+                DispatchQueue.main.async {
+                    isExporting = false
+                    presentSavePanel(data: data)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isExporting = false
+                    backupErrorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func presentSavePanel(data: Data) {
+        let panel = NSSavePanel()
+        panel.title = "Export CmdRack Backup"
+        panel.nameFieldStringValue = "CmdRack-Backup.cmdrack"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try data.write(to: url, options: .atomic)
+            backupResultMessage = "Backup exported successfully."
+        } catch {
+            backupErrorMessage = "Failed to write file: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Import
+
+    private func importBackup() {
+        let panel = NSOpenPanel()
+        panel.title = "Import CmdRack Backup"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let data = try Data(contentsOf: url)
+            // Validate that it decodes before asking for mode
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            _ = try decoder.decode(CmdRackBackup.self, from: data)
+            pendingImportData = data
+            showImportModeAlert = true
+        } catch {
+            backupErrorMessage = "Could not read backup file: \(error.localizedDescription)"
+        }
+    }
+
+    private func performImport(mode: BackupImportMode) {
+        guard let data = pendingImportData else { return }
+        pendingImportData = nil
+        isImporting = true
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let result = try BackupService.importBackup(from: data, mode: mode)
+                DispatchQueue.main.async {
+                    isImporting = false
+                    settings = AppSettings.load() // refresh settings UI
+                    backupResultMessage = "Import complete — \(result.commandsImported) commands added, settings restored."
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isImporting = false
+                    backupErrorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 }
 

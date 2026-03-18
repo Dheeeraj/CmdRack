@@ -87,4 +87,32 @@ final class DatabaseService {
 
         try migrator.migrate(writer)
     }
+
+    // MARK: - Analytics helpers (for backup / restore)
+
+    /// Fetch every analytics event in the database.
+    func fetchAllAnalyticsEvents() throws -> [AnalyticsEvent] {
+        guard let queue else { throw DatabaseError.applicationSupportUnavailable }
+        return try queue.read { db in
+            try AnalyticsEvent.fetchAll(db)
+        }
+    }
+
+    /// Batch-insert analytics events, silently skipping duplicates (by primary key).
+    func insertAnalyticsEvents(_ events: [AnalyticsEvent]) throws {
+        guard let queue else { throw DatabaseError.applicationSupportUnavailable }
+        try queue.write { db in
+            for event in events {
+                try event.insert(db, onConflict: .ignore)
+            }
+        }
+    }
+
+    /// Delete all analytics events (used by "replace" import mode).
+    func deleteAllAnalyticsEvents() throws {
+        guard let queue else { throw DatabaseError.applicationSupportUnavailable }
+        try queue.write { db in
+            try AnalyticsEvent.deleteAll(db)
+        }
+    }
 }
