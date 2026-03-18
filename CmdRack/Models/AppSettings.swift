@@ -62,15 +62,8 @@ struct AppSettings: Codable, Equatable {
     /// Stored as single characters with no modifiers. Default: z, x.
     var searchResultShortcutKeys: [String] = ["z", "x"]
 
-    // MARK: - Section order
-
-    /// Which section appears first in the popup.
-    var sectionOrder: SectionOrder = .pinnedFirst
-
-    enum SectionOrder: String, Codable, CaseIterable {
-        case pinnedFirst
-        case recentFirst
-    }
+    /// Keys reserved by the app for fixed actions (Add Command, Manage, Quit, Tab).
+    static let reservedKeys: Set<String> = ["=", "m", "⌫"]
 
     // MARK: - Validation
 
@@ -102,6 +95,24 @@ struct AppSettings: Codable, Equatable {
                 copy.searchResultShortcutKeys = cleaned
             }
         }
+
+        // Deduplicate: if any shortcut key appears in more than one group or
+        // clashes with a reserved key, reset the offending group to defaults.
+        let pinnedSet  = Set(copy.pinnedShortcutKeys.map { $0.lowercased() })
+        let recentSet  = Set(copy.recentShortcutKeys.map { $0.lowercased() })
+        let searchSet  = Set(copy.searchResultShortcutKeys.map { $0.lowercased() })
+
+        if !pinnedSet.isDisjoint(with: recentSet) || !pinnedSet.isDisjoint(with: searchSet)
+            || !pinnedSet.isDisjoint(with: Self.reservedKeys) {
+            copy.pinnedShortcutKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+        }
+        if !recentSet.isDisjoint(with: searchSet) || !recentSet.isDisjoint(with: Self.reservedKeys) {
+            copy.recentShortcutKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]
+        }
+        if !searchSet.isDisjoint(with: Self.reservedKeys) {
+            copy.searchResultShortcutKeys = ["z", "x"]
+        }
+
         return copy
     }
 }

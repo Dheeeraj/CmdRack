@@ -226,16 +226,34 @@ enum BackupService {
 
     // MARK: - Peek (read metadata without full import)
 
+    /// Lightweight envelope that only decodes scalar fields, skipping the large arrays entirely.
+    private struct BackupEnvelope: Decodable {
+        let version: Int
+        let exportedAt: Date
+        let deviceName: String
+        let commands: [IgnoredItem]
+        let analyticsEvents: [IgnoredItem]
+
+        /// A placeholder that accepts any JSON object/value without actually storing it.
+        struct IgnoredItem: Decodable {
+            init(from decoder: Decoder) throws {
+                // Skip all contents — we only need the array count.
+                _ = try decoder.singleValueContainer()
+            }
+        }
+    }
+
     /// Read just the envelope metadata from a .cmdrack file for the import confirmation sheet.
+    /// Uses a lightweight decoder that skips the large command/analytics payloads.
     static func peekMetadata(from data: Data) throws -> BackupMetadata {
         let json = try decompress(data)
-        let backup = try makeDecoder().decode(CmdRackBackup.self, from: json)
+        let envelope = try makeDecoder().decode(BackupEnvelope.self, from: json)
         return BackupMetadata(
-            deviceName: backup.deviceName,
-            exportedAt: backup.exportedAt,
-            commandCount: backup.commands.count,
-            analyticsCount: backup.analyticsEvents.count,
-            version: backup.version
+            deviceName: envelope.deviceName,
+            exportedAt: envelope.exportedAt,
+            commandCount: envelope.commands.count,
+            analyticsCount: envelope.analyticsEvents.count,
+            version: envelope.version
         )
     }
 
@@ -280,7 +298,10 @@ enum BackupService {
             if mode == .replace {
                 try db.deleteAllAnalyticsEvents()
             }
+            let analyticsBeforeCount = try db.analyticsEventCount()
             try db.insertAnalyticsEvents(backup.analyticsEvents)
+            let analyticsAfterCount = try db.analyticsEventCount()
+            let analyticsImported = analyticsAfterCount - analyticsBeforeCount
 
             // --- Settings ---
             DispatchQueue.main.async { backup.settings.save() }
@@ -301,7 +322,7 @@ enum BackupService {
 
             return BackupImportResult(
                 commandsImported: commandsImported,
-                analyticsEventsImported: backup.analyticsEvents.count,
+                analyticsEventsImported: analyticsImported,
                 settingsRestored: true,
                 pinnedOrderRestored: !pinnedUUIDs.isEmpty,
                 recentCopiedRestored: !recentUUIDs.isEmpty

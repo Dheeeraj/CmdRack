@@ -140,7 +140,7 @@ struct ManageDashboardView: View {
 
     private func bringWindowToFront() {
         DispatchQueue.main.async {
-            NSApp.windows.first { $0.title == "CmdRack" }?.makeKeyAndOrderFront(nil)
+            NSApp.windows.first { $0.title == "Command Rack" }?.makeKeyAndOrderFront(nil)
         }
     }
 }

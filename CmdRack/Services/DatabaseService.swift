@@ -105,6 +105,14 @@ final class DatabaseService {
         }
     }
 
+    /// Count analytics events in the database.
+    func analyticsEventCount() throws -> Int {
+        guard let queue else { throw DatabaseError.applicationSupportUnavailable }
+        return try queue.read { db in
+            try AnalyticsEvent.fetchCount(db)
+        }
+    }
+
     /// Batch-insert analytics events, silently skipping duplicates (by primary key).
     func insertAnalyticsEvents(_ events: [AnalyticsEvent]) throws {
         guard let queue else { throw DatabaseError.applicationSupportUnavailable }

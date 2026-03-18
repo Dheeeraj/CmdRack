@@ -47,7 +47,13 @@ struct CommandItem: Codable, FetchableRecord, PersistableRecord, TableRecord, Id
     // MARK: - FetchableRecord (decode from row)
 
     init(row: Row) throws {
-        id = UUID(uuidString: row["id"]) ?? UUID()
+        let rawID: String = row["id"]
+        if let parsed = UUID(uuidString: rawID) {
+            id = parsed
+        } else {
+            id = UUID()
+            NSLog("[CmdRack] CommandItem has malformed UUID: \(rawID) — assigned new id \(id)")
+        }
         title = row["title"]
         command = row["command"]
         project = row["project"]

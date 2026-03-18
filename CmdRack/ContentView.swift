@@ -284,6 +284,11 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
             settings = AppSettings.load()
+            // Recreate the monitor so the closure captures fresh settings
+            if isSearchActive {
+                stopSearchShortcutMonitor()
+                startSearchShortcutMonitorIfNeeded()
+            }
         }
         .onChange(of: isSearchActive) { _, newValue in
             if newValue {

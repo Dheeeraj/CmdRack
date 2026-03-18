@@ -8,13 +8,14 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    @StateObject private var shortcutService = GlobalShortcutService.shared
+    @ObservedObject private var shortcutService = GlobalShortcutService.shared
     @State private var keyCode: UInt16 = 0
     @State private var modifiers: NSEvent.ModifierFlags = []
     @State private var hasPermission = false
     @State private var showClearDataConfirmation = false
     @State private var clearDataError: String?
     @State private var settings = AppSettings.load()
+    @State private var settingsSaveTask: DispatchWorkItem?
 
     // Backup / Restore
     @State private var isExporting = false
@@ -377,7 +378,11 @@ struct SettingsView: View {
             checkPermission()
         }
         .onChange(of: settings) { _, newValue in
-            newValue.save()
+            // Debounce saves so slider drags don't fire on every tick
+            settingsSaveTask?.cancel()
+            let task = DispatchWorkItem { newValue.save() }
+            settingsSaveTask = task
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: task)
         }
 
         // MARK: - Alerts

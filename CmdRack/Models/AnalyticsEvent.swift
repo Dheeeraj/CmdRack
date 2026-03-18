@@ -49,7 +49,13 @@ struct AnalyticsEvent: Codable, FetchableRecord, PersistableRecord, TableRecord,
     }
 
     init(row: Row) throws {
-        id = UUID(uuidString: row["id"]) ?? UUID()
+        let rawID: String = row["id"]
+        if let parsed = UUID(uuidString: rawID) {
+            id = parsed
+        } else {
+            id = UUID()
+            NSLog("[CmdRack] AnalyticsEvent has malformed UUID: \(rawID) — assigned new id \(id)")
+        }
         type = AnalyticsEventType(rawValue: row["type"]) ?? .popoverOpen
         if let cmd: String? = row["commandId"], let raw = cmd, let uuid = UUID(uuidString: raw) {
             commandId = uuid
