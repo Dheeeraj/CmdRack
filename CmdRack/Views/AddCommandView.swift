@@ -392,7 +392,7 @@ struct AddCommandView: View {
         let raw = tagInput.trimmingCharacters(in: .whitespaces)
         let newTags = raw.split(separator: ",")
             .map { String($0.trimmingCharacters(in: .whitespaces).prefix(settings.tagTextMax)) }
-            .filter { !$0.isEmpty && !tags.contains($0) }
+            .filter { tag in !tag.isEmpty && !tags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) }
 
         let remaining = settings.tagMaxCount - tags.count
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -705,7 +705,8 @@ struct FlowLayout: Layout {
         }
 
         let totalHeight = currentY + lineHeight
-        return (CGSize(width: maxWidth, height: totalHeight), positions)
+        let actualWidth = maxWidth.isFinite ? maxWidth : currentX
+        return (CGSize(width: actualWidth, height: totalHeight), positions)
     }
 }
 

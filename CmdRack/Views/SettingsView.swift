@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var clearDataError: String?
     @State private var settings = AppSettings.load()
     @State private var settingsSaveTask: DispatchWorkItem?
+    @State private var suppressSave = true  // Skip the first onChange triggered by onAppear
 
     // Backup / Restore
     @State private var isExporting = false
@@ -376,8 +377,11 @@ struct SettingsView: View {
             modifiers = shortcutService.modifiers
             settings = AppSettings.load()
             checkPermission()
+            // Allow onChange to start saving after the initial load settles
+            DispatchQueue.main.async { suppressSave = false }
         }
         .onChange(of: settings) { _, newValue in
+            guard !suppressSave else { return }
             // Debounce saves so slider drags don't fire on every tick
             settingsSaveTask?.cancel()
             let task = DispatchWorkItem { newValue.save() }

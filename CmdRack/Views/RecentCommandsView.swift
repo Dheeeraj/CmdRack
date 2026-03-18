@@ -28,7 +28,7 @@ struct CommandListSectionView: View {
                         onSelect(item)
                     } label: {
                         HStack {
-                            CommandRowCompactView(item: item) { }
+                            CommandRowCompactView(item: item)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                             if let key = shortcutKey {
@@ -128,18 +128,9 @@ struct RecentCommandsView: View {
     }
 
     private func copyAndToast(_ item: CommandItem) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(item.command, forType: .string)
-        RecentCopiedTracker.shared.recordCopy(id: item.id)
-        AnalyticsService.shared.trackCommandCopied(item)
-        showCopiedToast()
-    }
-
-    private func showCopiedToast() {
         showCopiedAlert = true
+        ClipboardService.copyAndDismiss(item)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: .cmdRackDismissPopover, object: nil)
             showCopiedAlert = false
         }
     }
@@ -147,7 +138,6 @@ struct RecentCommandsView: View {
 
 struct CommandRowCompactView: View {
     let item: CommandItem
-    var onCopy: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {

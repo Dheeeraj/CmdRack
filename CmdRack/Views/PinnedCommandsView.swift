@@ -75,18 +75,9 @@ struct PinnedCommandsView: View {
     }
 
     private func copyAndToast(_ item: CommandItem) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(item.command, forType: .string)
-        RecentCopiedTracker.shared.recordCopy(id: item.id)
-        AnalyticsService.shared.trackCommandCopied(item)
-        showCopiedToast()
-    }
-
-    private func showCopiedToast() {
         showCopiedAlert = true
+        ClipboardService.copyAndDismiss(item)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: .cmdRackDismissPopover, object: nil)
             showCopiedAlert = false
         }
     }

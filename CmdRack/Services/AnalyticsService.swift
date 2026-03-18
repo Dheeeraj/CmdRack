@@ -265,12 +265,19 @@ final class AnalyticsService {
         topStringField(column: "project", lastDays: lastDays, limit: limit) { [$0] }
     }
 
+    /// Allowed column names for topStringField to prevent SQL injection.
+    private static let allowedColumns: Set<String> = ["tags", "tool", "project"]
+
     private func topStringField(
         column: String,
         lastDays: Int?,
         limit: Int,
         explode: (String) -> [String]
     ) -> [StringUsageSummary] {
+        guard Self.allowedColumns.contains(column) else {
+            NSLog("[CmdRack] topStringField called with disallowed column: \(column)")
+            return []
+        }
         guard let queue = database.queue, limit > 0 else { return [] }
         do {
             return try queue.read { db in

@@ -16,16 +16,16 @@ struct CmdRackApp: App {
         guard let fullSize = NSImage(named: "MenuBarIcon") else { return NSImage() }
         let targetSize: CGFloat = 22
         let newSize = NSSize(width: targetSize, height: targetSize)
-        let resized = NSImage(size: newSize)
-        resized.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
-        fullSize.draw(
-            in: NSRect(origin: .zero, size: newSize),
-            from: NSRect(origin: .zero, size: fullSize.size),
-            operation: .copy,
-            fraction: 1.0
-        )
-        resized.unlockFocus()
+        let resized = NSImage(size: newSize, flipped: false) { rect in
+            NSGraphicsContext.current?.imageInterpolation = .high
+            fullSize.draw(
+                in: rect,
+                from: NSRect(origin: .zero, size: fullSize.size),
+                operation: .copy,
+                fraction: 1.0
+            )
+            return true
+        }
         resized.isTemplate = true
         return resized
     }()

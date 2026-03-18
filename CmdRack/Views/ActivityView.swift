@@ -385,17 +385,25 @@ struct ActivityView: View {
 
     // MARK: - Helpers
 
-    private func formatDate(_ date: Date) -> String {
+    private static let mediumDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
         f.timeStyle = .none
-        return f.string(from: date)
+        return f
+    }()
+
+    private static let shortDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE"
+        return f
+    }()
+
+    private func formatDate(_ date: Date) -> String {
+        Self.mediumDateFormatter.string(from: date)
     }
 
     private func shortDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "EEE"
-        return f.string(from: date)
+        Self.shortDayFormatter.string(from: date)
     }
 }
 

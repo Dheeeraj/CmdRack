@@ -106,7 +106,7 @@ struct ContentView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        TextField("Search commands...", text: $searchText)
+                        TextField("Type 2+ characters to search…", text: $searchText)
                             .textFieldStyle(.plain)
                             .focused($searchFocused)
                         Button {
@@ -144,7 +144,7 @@ struct ContentView: View {
                                         copyAndToast(item)
                                     } label: {
                                         HStack {
-                                            CommandRowCompactView(item: item) { }
+                                            CommandRowCompactView(item: item)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
                                                 .contentShape(Rectangle())
                                             if let raw {
@@ -325,19 +325,9 @@ struct ContentView: View {
     }
 
     private func copyAndToast(_ item: CommandItem) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(item.command, forType: .string)
-        RecentCopiedTracker.shared.recordCopy(id: item.id)
-        AnalyticsService.shared.trackCommandCopied(item)
-        showCopiedToast()
-    }
-
-    private func showCopiedToast() {
         showCopiedAlert = true
-        // Dismiss the popover directly — never use NSApp.keyWindow which can target the wrong window
+        ClipboardService.copyAndDismiss(item)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            NotificationCenter.default.post(name: .cmdRackDismissPopover, object: nil)
             showCopiedAlert = false
         }
     }
