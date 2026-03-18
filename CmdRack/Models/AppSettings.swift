@@ -56,6 +56,12 @@ struct AppSettings: Codable, Equatable {
     /// Internal storage limit for the recent-copied list (always 10).
     static let recentStorageLimit: Int = 10
 
+    // MARK: - Search (popup search results)
+
+    /// Two fixed shortcuts for the first two search results in the popup.
+    /// Stored as single characters with no modifiers. Default: z, x.
+    var searchResultShortcutKeys: [String] = ["z", "x"]
+
     // MARK: - Section order
 
     /// Which section appears first in the popup.
@@ -80,6 +86,21 @@ struct AppSettings: Codable, Equatable {
         }
         if copy.recentShortcutKeys.count != 10 {
             copy.recentShortcutKeys = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]
+        }
+        if copy.searchResultShortcutKeys.count != 2 {
+            copy.searchResultShortcutKeys = ["z", "x"]
+        }
+        if copy.searchResultShortcutKeys.count == 2 {
+            let cleaned = copy.searchResultShortcutKeys.map { raw -> String in
+                let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                guard let first = trimmed.first else { return "" }
+                return String(first)
+            }
+            if cleaned.contains(where: { $0.isEmpty }) {
+                copy.searchResultShortcutKeys = ["z", "x"]
+            } else {
+                copy.searchResultShortcutKeys = cleaned
+            }
         }
         return copy
     }

@@ -27,8 +27,10 @@ struct SettingsView: View {
     // Shortcut editors
     @State private var showPinnedShortcutsSheet = false
     @State private var showRecentShortcutsSheet = false
+    @State private var showSearchShortcutsSheet = false
     @State private var editPinnedKeys: [String] = []
     @State private var editRecentKeys: [String] = []
+    @State private var editSearchKeys: [String] = []
 
     private static let intFormatter: NumberFormatter = {
         let f = NumberFormatter()
@@ -194,10 +196,28 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(.plain)
+
+                    Button {
+                        editSearchKeys = settings.searchResultShortcutKeys
+                        if editSearchKeys.count != 2 { editSearchKeys = ["z", "x"] }
+                        showSearchShortcutsSheet = true
+                    } label: {
+                        HStack {
+                            Text("Search result shortcuts (2)")
+                            Spacer()
+                            Text(SearchResultShortcutKeysSheetView.summary(for: settings.searchResultShortcutKeys))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("Menu bar options")
                 } footer: {
-                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder. Shortcuts default to 1–0 for pinned and q–p for recent.")
+                    Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder. Shortcuts default to 1–0 for pinned and q–p for recent. Search result shortcuts are always two single keys (no modifiers).")
                 }
 
                 // ── 4. Command limits ───────────────────────────────
@@ -421,6 +441,20 @@ struct SettingsView: View {
                     if editRecentKeys.count == 10 {
                         var updated = settings
                         updated.recentShortcutKeys = editRecentKeys
+                        updated.save()
+                        settings = updated
+                    }
+                }
+            )
+        }
+        .sheet(isPresented: $showSearchShortcutsSheet) {
+            SearchResultShortcutKeysSheetView(
+                keys: $editSearchKeys,
+                onDismiss: {
+                    showSearchShortcutsSheet = false
+                    if editSearchKeys.count == 2 {
+                        var updated = settings
+                        updated.searchResultShortcutKeys = editSearchKeys
                         updated.save()
                         settings = updated
                     }
@@ -723,6 +757,66 @@ private struct ShortcutKeysSheetView: View {
             .listStyle(.inset)
         }
         .frame(minWidth: 280, minHeight: 340)
+    }
+}
+
+// MARK: - Search result shortcut keys editor (special keys only)
+private struct SearchResultShortcutKeysSheetView: View {
+    @Binding var keys: [String]
+    var onDismiss: () -> Void
+
+    static func summary(for keys: [String]) -> String {
+        let safe = (keys.count == 2) ? keys : ["z", "x"]
+        let a = safe[0].trimmingCharacters(in: .whitespacesAndNewlines).prefix(1).lowercased()
+        let b = safe[1].trimmingCharacters(in: .whitespacesAndNewlines).prefix(1).lowercased()
+        return "\(a), \(b)"
+    }
+
+    var body: some View {
+        let safeKeys: Binding<[String]> = Binding(
+            get: { keys.count == 2 ? keys : ["z", "x"] },
+            set: { keys = $0 }
+        )
+
+        VStack(spacing: 0) {
+            HStack {
+                Text("Search result shortcuts")
+                    .font(.headline)
+                Spacer()
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding()
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("These apply to the first two search results in the popup. Press the key to instantly copy (no modifiers).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(0..<2, id: \.self) { i in
+                    HStack(spacing: 12) {
+                        Text("Result \(i + 1)")
+                            .frame(width: 70, alignment: .leading)
+                        SingleKeyRecorderView(key: Binding(
+                            get: { safeKeys.wrappedValue[i] },
+                            set: { newVal in
+                                var copy = safeKeys.wrappedValue
+                                copy[i] = newVal
+                                safeKeys.wrappedValue = copy
+                            }
+                        ))
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding()
+
+            Spacer()
+        }
+        .frame(minWidth: 420, minHeight: 240)
     }
 }
 

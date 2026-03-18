@@ -15,6 +15,9 @@ struct ContentView: View {
     @FocusState private var searchFocused: Bool
     @State private var allCommands: [CommandItem] = []
     @State private var showCopiedAlert = false
+    @State private var recentCopiedVersion = 0
+    @State private var settings = AppSettings.load()
+    @State private var searchShortcutMonitor: Any?
 
     private let repository = CommandRepository()
 
@@ -30,6 +33,66 @@ struct ContentView: View {
         }
         .prefix(2)
         .map { $0 }
+    }
+
+    private var hasPinnedSection: Bool {
+        allCommands.contains(where: { $0.pinned })
+    }
+
+    private var hasRecentSection: Bool {
+        _ = recentCopiedVersion // keep computed value in sync with notifications
+        guard !allCommands.isEmpty else { return false }
+        let allIDs = Set(allCommands.map(\.id))
+        return RecentCopiedTracker.shared.ids.contains(where: { allIDs.contains($0) })
+    }
+
+    private func searchShortcutRaw(forIndex index: Int) -> String? {
+        guard index >= 0, index < 2 else { return nil }
+        let keys = settings.searchResultShortcutKeys
+        guard keys.count == 2 else { return nil }
+        return keys[index]
+    }
+
+    private func displayString(forSearchShortcut raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return "—" }
+        return String(first).lowercased()
+    }
+
+    private func startSearchShortcutMonitorIfNeeded() {
+        guard searchShortcutMonitor == nil else { return }
+        searchShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Only when search is open and there are results to act on.
+            guard isSearchActive, searchText.count > 1, !searchResults.isEmpty else { return event }
+
+            // No modifiers — keep this truly single-key.
+            let mods = event.modifierFlags.intersection([.command, .control, .option, .shift, .function])
+            guard mods.isEmpty, let chars = event.charactersIgnoringModifiers, !chars.isEmpty else { return event }
+
+            let pressed = String(chars.prefix(1)).lowercased()
+            let keys = settings.searchResultShortcutKeys
+                .prefix(2)
+                .map { String($0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().prefix(1)) }
+
+            guard keys.count == 2 else { return event }
+
+            if pressed == keys[0] {
+                copyAndToast(searchResults[0])
+                return nil
+            }
+            if pressed == keys[1], searchResults.count > 1 {
+                copyAndToast(searchResults[1])
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func stopSearchShortcutMonitor() {
+        if let m = searchShortcutMonitor {
+            NSEvent.removeMonitor(m)
+            searchShortcutMonitor = nil
+        }
     }
 
     var body: some View {
@@ -74,15 +137,22 @@ struct ContentView: View {
                                 .padding(.vertical, 4)
                         } else {
                             VStack(alignment: .leading, spacing: 4) {
-                                ForEach(searchResults) { item in
-                                    Button {
+                                ForEach(Array(searchResults.enumerated()), id: \.element.id) { index, item in
+                                    let raw = searchShortcutRaw(forIndex: index)
+                                    let button = Button {
                                         copyAndToast(item)
                                     } label: {
-                                        CommandRowCompactView(item: item) { }
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .contentShape(Rectangle())
+                                        HStack {
+                                            CommandRowCompactView(item: item) { }
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .contentShape(Rectangle())
+                                            if let raw {
+                                                ShortcutBadge(key: displayString(forSearchShortcut: raw))
+                                            }
+                                        }
                                     }
                                     .buttonStyle(.plain)
+                                    button
                                 }
                             }
                         }
@@ -134,13 +204,18 @@ struct ContentView: View {
                 .transition(.opacity)
             }
 
-            PinnedCommandsView()
+            
 
-            Divider()
+            if hasPinnedSection && hasRecentSection {
+                PinnedCommandsView()
+                Divider()
+            }
+  
 
-            RecentCommandsView()
-
-            Divider()
+            if hasPinnedSection || hasRecentSection {
+                RecentCommandsView()
+                Divider()
+            }
 
             Button {
                 openWindow(id: "add-command")
@@ -162,7 +237,7 @@ struct ContentView: View {
                 HStack {
                     Text("Manage / Settings")
                     Spacer()
-                    ShortcutBadge(key: "M")
+                    ShortcutBadge(key: "m")
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
@@ -189,6 +264,22 @@ struct ContentView: View {
         .onAppear(perform: loadCommands)
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
             loadCommands()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackRecentCopiedDidChange)) { _ in
+            recentCopiedVersion += 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
+            settings = AppSettings.load()
+        }
+        .onChange(of: isSearchActive) { _, newValue in
+            if newValue {
+                startSearchShortcutMonitorIfNeeded()
+            } else {
+                stopSearchShortcutMonitor()
+            }
+        }
+        .onDisappear {
+            stopSearchShortcutMonitor()
         }
         .overlay(alignment: .center) {
             if showCopiedAlert {
