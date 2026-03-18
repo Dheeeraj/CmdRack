@@ -16,12 +16,17 @@ final class DatabaseService {
     static let shared = DatabaseService()
 
     private(set) var queue: DatabaseQueue?
+    /// If the database failed to initialise, this holds the error.
+    private(set) var initError: Error?
     var isAvailable: Bool { queue != nil }
 
     private init() {
         do {
             guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                let error = DatabaseError.applicationSupportUnavailable
+                self.initError = error
                 queue = nil
+                NSLog("[CmdRack] Database init failed: \(error)")
                 return
             }
 
@@ -38,6 +43,8 @@ final class DatabaseService {
             queue = dbQueue
         } catch {
             queue = nil
+            initError = error
+            NSLog("[CmdRack] Database init failed: \(error.localizedDescription)")
         }
     }
 

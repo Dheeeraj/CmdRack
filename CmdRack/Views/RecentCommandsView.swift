@@ -137,16 +137,10 @@ struct RecentCommandsView: View {
     }
 
     private func showCopiedToast() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            showCopiedAlert = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        showCopiedAlert = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             closeMenuBarWindow()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showCopiedAlert = false
-            }
+            showCopiedAlert = false
         }
     }
 

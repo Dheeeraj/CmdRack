@@ -283,17 +283,21 @@ enum BackupService {
             try db.insertAnalyticsEvents(backup.analyticsEvents)
 
             // --- Settings ---
-            backup.settings.save()
+            DispatchQueue.main.async { backup.settings.save() }
 
             // --- Pinned order ---
             let pinnedUUIDs = backup.pinnedOrderIDs.compactMap { UUID(uuidString: $0) }
-            PinnedOrderStore.shared.ids = pinnedUUIDs
-            NotificationCenter.default.post(name: .cmdRackPinnedOrderDidChange, object: nil)
+            DispatchQueue.main.async {
+                PinnedOrderStore.shared.ids = pinnedUUIDs
+                NotificationCenter.default.post(name: .cmdRackPinnedOrderDidChange, object: nil)
+            }
 
             // --- Recent copied ---
             let recentUUIDs = backup.recentCopiedIDs.compactMap { UUID(uuidString: $0) }
-            RecentCopiedTracker.shared.ids = recentUUIDs
-            NotificationCenter.default.post(name: .cmdRackRecentCopiedDidChange, object: nil)
+            DispatchQueue.main.async {
+                RecentCopiedTracker.shared.ids = recentUUIDs
+                NotificationCenter.default.post(name: .cmdRackRecentCopiedDidChange, object: nil)
+            }
 
             return BackupImportResult(
                 commandsImported: commandsImported,

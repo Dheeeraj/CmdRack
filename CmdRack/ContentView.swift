@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var recentCopiedVersion = 0
     @State private var settings = AppSettings.load()
     @State private var searchShortcutMonitor: Any?
+    @State private var databaseError: String?
 
     private let repository = CommandRepository()
 
@@ -261,7 +262,20 @@ struct ContentView: View {
         }
         .padding()
         .frame(width: 340)
-        .onAppear(perform: loadCommands)
+        .onAppear {
+            loadCommands()
+            if let error = DatabaseService.shared.initError {
+                databaseError = error.localizedDescription
+            }
+        }
+        .alert("Database Error", isPresented: Binding(
+            get: { databaseError != nil },
+            set: { if !$0 { databaseError = nil } }
+        )) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("CmdRack could not open its database. Your commands may not load or save.\n\n\(databaseError ?? "")")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackCommandsDidChange)) { _ in
             loadCommands()
         }
@@ -315,16 +329,11 @@ struct ContentView: View {
     }
 
     private func showCopiedToast() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            showCopiedAlert = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        showCopiedAlert = true
+        // Close immediately — the window dismissal is the feedback
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             NSApp.keyWindow?.close()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showCopiedAlert = false
-            }
+            showCopiedAlert = false
         }
     }
 }

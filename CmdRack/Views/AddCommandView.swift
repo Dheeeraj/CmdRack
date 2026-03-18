@@ -581,44 +581,46 @@ struct AddCommandView: View {
         let cleanCommand = command.trimmingCharacters(in: .whitespaces)
         let now = Date()
 
-        do {
-            if let existing = commandToEdit {
-                var updated = existing
-                updated.title     = cleanTitle
-                updated.command   = cleanCommand
-                updated.tags      = tags
-                updated.project   = project.isEmpty ? nil : project.trimmingCharacters(in: .whitespaces)
-                updated.tool      = tool.isEmpty    ? nil : tool.trimmingCharacters(in: .whitespaces)
-                updated.pinned    = pinned
-                updated.updatedAt = now
-                updated.metadata.append(CommandMetadataEntry.make(type: .update, date: now))
-                try repository.update(updated)
-            } else {
-                let item = CommandItem(
-                    id: UUID(),
-                    title:     cleanTitle,
-                    command:   cleanCommand,
-                    tags:      tags,
-                    metadata:  [CommandMetadataEntry.make(type: .create, date: now)],
-                    project:   project.isEmpty ? nil : project.trimmingCharacters(in: .whitespaces),
-                    tool:      tool.isEmpty    ? nil : tool.trimmingCharacters(in: .whitespaces),
-                    pinned:    pinned,
-                    createdAt: now,
-                    updatedAt: now
-                )
-                try repository.insert(item)
+        // Dispatch to next run-loop tick so SwiftUI can render the spinner
+        DispatchQueue.main.async {
+            do {
+                if let existing = commandToEdit {
+                    var updated = existing
+                    updated.title     = cleanTitle
+                    updated.command   = cleanCommand
+                    updated.tags      = tags
+                    updated.project   = project.isEmpty ? nil : project.trimmingCharacters(in: .whitespaces)
+                    updated.tool      = tool.isEmpty    ? nil : tool.trimmingCharacters(in: .whitespaces)
+                    updated.pinned    = pinned
+                    updated.updatedAt = now
+                    updated.metadata.append(CommandMetadataEntry.make(type: .update, date: now))
+                    try repository.update(updated)
+                } else {
+                    let item = CommandItem(
+                        id: UUID(),
+                        title:     cleanTitle,
+                        command:   cleanCommand,
+                        tags:      tags,
+                        metadata:  [CommandMetadataEntry.make(type: .create, date: now)],
+                        project:   project.isEmpty ? nil : project.trimmingCharacters(in: .whitespaces),
+                        tool:      tool.isEmpty    ? nil : tool.trimmingCharacters(in: .whitespaces),
+                        pinned:    pinned,
+                        createdAt: now,
+                        updatedAt: now
+                    )
+                    try repository.insert(item)
+                }
+                onSave?()
+                if let onDismiss {
+                    onDismiss()
+                } else {
+                    closeWindow()
+                }
+            } catch {
+                errors = [error.localizedDescription]
             }
-            onSave?()
-            if let onDismiss {
-                onDismiss()
-            } else {
-                closeWindow()
-            }
-        } catch {
-            errors = [error.localizedDescription]
+            isSaving = false
         }
-
-        isSaving = false
     }
 }
 

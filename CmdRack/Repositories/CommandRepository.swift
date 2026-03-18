@@ -18,6 +18,18 @@ final class CommandRepository {
         self.database = database
     }
 
+    /// Post notification safely on the main thread regardless of calling context.
+    private func postCommandsDidChange() {
+        let post = {
+            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+        }
+        if Thread.isMainThread {
+            post()
+        } else {
+            DispatchQueue.main.async { post() }
+        }
+    }
+
     func fetchAll() throws -> [CommandItem] {
         guard let queue = database.queue else {
             throw CommandRepositoryError.databaseUnavailable
@@ -35,7 +47,7 @@ final class CommandRepository {
             try queue.write { db in
                 try command.insert(db)
             }
-            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+            postCommandsDidChange()
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
@@ -49,7 +61,7 @@ final class CommandRepository {
             try queue.write { db in
                 try command.update(db)
             }
-            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+            postCommandsDidChange()
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
@@ -63,7 +75,7 @@ final class CommandRepository {
             try queue.write { db in
                 try CommandItem.filter(Column("id") == id.uuidString).deleteAll(db)
             }
-            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+            postCommandsDidChange()
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
@@ -76,7 +88,7 @@ final class CommandRepository {
         try queue.write { db in
             try CommandItem.deleteAll(db)
         }
-        NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+        postCommandsDidChange()
     }
 
     func fetchByTool(_ tool: String) throws -> [CommandItem] {
@@ -102,7 +114,7 @@ final class CommandRepository {
                     try command.insert(db, onConflict: .ignore)
                 }
             }
-            NotificationCenter.default.post(name: .cmdRackCommandsDidChange, object: nil)
+            postCommandsDidChange()
         } catch {
             throw CommandRepositoryError.databaseError(error)
         }
