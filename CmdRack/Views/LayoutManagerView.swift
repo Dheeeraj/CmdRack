@@ -59,31 +59,16 @@ struct LayoutManagerView: View {
             } else {
                 List {
                     ForEach(settings.layouts) { layout in
-                        LayoutRowView(
-                            layout: layout,
-                            isActive: settings.activeLayoutId == layout.id,
-                            onEdit: {
-                                editingLayout = layout
-                            },
-                            onSetActive: {
-                                settings.activeLayoutId = layout.id
-                                settings.save()
-                            },
-                            onClearActive: {
-                                settings.activeLayoutId = nil
-                                settings.save()
-                            },
-                            onDelete: {
-                                showDeleteConfirmation = layout.id
-                            }
-                        )
+                        layoutRow(layout)
                     }
                     .onMove { from, to in
                         settings.layouts.move(fromOffsets: from, toOffset: to)
                         settings.save()
                     }
                 }
-                .listStyle(.inset(alternatesRowBackgrounds: true))
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .padding(.top, 8)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -98,6 +83,7 @@ struct LayoutManagerView: View {
                         set: { settings.layouts[idx] = $0 }
                     ),
                     settings: settings,
+                    isActive: settings.activeLayoutId == layout.id,
                     onDone: {
                         editingLayout = nil
                         settings.layouts[idx].updatedAt = Date()
@@ -107,6 +93,22 @@ struct LayoutManagerView: View {
                         editingLayout = nil
                         // Reload to discard unsaved changes
                         settings = AppSettings.load()
+                    },
+                    onSetActive: {
+                        settings.activeLayoutId = layout.id
+                        settings.save()
+                    },
+                    onClearActive: {
+                        settings.activeLayoutId = nil
+                        settings.save()
+                    },
+                    onDelete: {
+                        editingLayout = nil
+                        settings.layouts.removeAll { $0.id == layout.id }
+                        if settings.activeLayoutId == layout.id {
+                            settings.activeLayoutId = nil
+                        }
+                        settings.save()
                     }
                 )
             }
@@ -130,64 +132,72 @@ struct LayoutManagerView: View {
             Text("This layout will be permanently deleted.")
         }
     }
-}
 
-// MARK: - Layout row
-
-private struct LayoutRowView: View {
-    let layout: LayoutConfiguration
-    let isActive: Bool
-    let onEdit: () -> Void
-    let onSetActive: () -> Void
-    let onClearActive: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(layout.name)
-                        .font(.subheadline.weight(.medium))
-                    if isActive {
-                        Text("Active")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green, in: Capsule())
-                    }
-                }
-                Text("\(layout.sections.count) section\(layout.sections.count == 1 ? "" : "s")")
-                    .font(.caption)
+    @ViewBuilder
+    private func layoutRow(_ layout: LayoutConfiguration) -> some View {
+        let isActive = settings.activeLayoutId == layout.id
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(layout.name)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text("\(layout.sections.count) section\(layout.sections.count == 1 ? "" : "s")\(isActive ? " · Active" : "")")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-
-            Spacer()
-
-            Button {
-                if isActive { onClearActive() } else { onSetActive() }
-            } label: {
-                Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isActive ? .green : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help(isActive ? "Deactivate layout" : "Set as active layout")
-
-            Button { onEdit() } label: {
-                Image(systemName: "pencil")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Edit layout")
-
-            Button { onDelete() } label: {
-                Image(systemName: "trash")
-                    .foregroundStyle(.red.opacity(0.7))
-            }
-            .buttonStyle(.plain)
-            .help("Delete layout")
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 4)
+        .padding(10)
+        .contentShape(Rectangle())
+        .onTapGesture { editingLayout = layout }
+        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    isActive
+                        ? RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.accentColor.opacity(0.08))
+                        : nil
+                )
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+        )
+        .listRowSeparator(.hidden)
+        .contextMenu {
+            Button {
+                editingLayout = layout
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            if isActive {
+                Button {
+                    settings.activeLayoutId = nil
+                    settings.save()
+                } label: {
+                    Label("Remove Active", systemImage: "circle")
+                }
+            } else {
+                Button {
+                    settings.activeLayoutId = layout.id
+                    settings.save()
+                } label: {
+                    Label("Set as Active", systemImage: "checkmark.circle")
+                }
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                showDeleteConfirmation = layout.id
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -196,11 +206,16 @@ private struct LayoutRowView: View {
 private struct LayoutEditorSheet: View {
     @Binding var layout: LayoutConfiguration
     let settings: AppSettings
+    let isActive: Bool
     let onDone: () -> Void
     let onCancel: () -> Void
+    let onSetActive: () -> Void
+    let onClearActive: () -> Void
+    let onDelete: () -> Void
 
     @State private var allCommands: [CommandItem] = []
     @State private var showAddSection = false
+    @State private var showDeleteConfirmation = false
 
     // Available filter values from existing commands
     private var availableTags: [String] {
@@ -336,7 +351,23 @@ private struct LayoutEditorSheet: View {
             HStack(spacing: 10) {
                 Button("Cancel") { onCancel() }
                     .keyboardShortcut(.cancelAction)
+
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .help("Delete layout")
+
+                Button {
+                    if isActive { onClearActive() } else { onSetActive() }
+                } label: {
+                    Image(systemName: isActive ? "checkmark.circle.fill" : "checkmark.circle")
+                }
+                .help(isActive ? "Remove as active" : "Set as active")
+
                 Spacer()
+
                 Button("Done") { onDone() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
@@ -346,6 +377,12 @@ private struct LayoutEditorSheet: View {
             .padding(.vertical, 12)
         }
         .frame(width: 500, height: 520)
+        .alert("Delete Layout?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) { onDelete() }
+        } message: {
+            Text("This layout will be permanently deleted.")
+        }
         .onAppear { loadCommands() }
         .sheet(isPresented: $showAddSection) {
             AddSectionSheet(
@@ -432,6 +469,12 @@ private struct SectionEditorRow: View {
 
 // MARK: - Add section sheet
 
+private enum SectionFilterTab: String, CaseIterable {
+    case tag = "Tag"
+    case project = "Project"
+    case tool = "Tool"
+}
+
 private struct AddSectionSheet: View {
     let availableTags: [String]
     let availableProjects: [String]
@@ -439,21 +482,30 @@ private struct AddSectionSheet: View {
     let onAdd: (LayoutSection) -> Void
     let onCancel: () -> Void
 
-    @State private var filterType: FilterType = .tag
+    @State private var selectedTab: SectionFilterTab = .tag
     @State private var selectedValue = ""
     @State private var customTitle = ""
-
-    private enum FilterType: String, CaseIterable {
-        case tag = "Tag"
-        case project = "Project"
-        case tool = "Tool"
-    }
+    @State private var searchText = ""
 
     private var availableValues: [String] {
-        switch filterType {
+        switch selectedTab {
         case .tag:     return availableTags
         case .project: return availableProjects
         case .tool:    return availableTools
+        }
+    }
+
+    private var filteredValues: [String] {
+        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !query.isEmpty else { return availableValues }
+        return availableValues.filter { $0.lowercased().contains(query) }
+    }
+
+    private var searchPlaceholder: String {
+        switch selectedTab {
+        case .tag:     return "Search tags"
+        case .project: return "Search projects"
+        case .tool:    return "Search tools"
         }
     }
 
@@ -463,6 +515,7 @@ private struct AddSectionSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header
             HStack {
                 Text("Add Section")
                     .font(.headline)
@@ -474,83 +527,63 @@ private struct AddSectionSheet: View {
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 12) {
-                // Filter type
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Filter by")
-                        .font(.caption.weight(.semibold))
+            VStack(alignment: .leading, spacing: 0) {
+                // Search bar
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    Picker("", selection: $filterType) {
-                        ForEach(FilterType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
+                        .font(.body)
+                    TextField(searchPlaceholder, text: $searchText)
+                        .textFieldStyle(.plain)
+                }
+                .padding(10)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+
+                // Tabs
+                HStack(spacing: 4) {
+                    ForEach(SectionFilterTab.allCases, id: \.self) { tab in
+                        Button {
+                            selectedTab = tab
+                            selectedValue = ""
+                            searchText = ""
+                        } label: {
+                            Text(tab.rawValue)
+                                .font(.caption)
+                                .fontWeight(selectedTab == tab ? .semibold : .regular)
+                                .foregroundStyle(selectedTab == tab ? .primary : .secondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(selectedTab == tab ? Color.primary.opacity(0.12) : Color.clear)
+                                .clipShape(Capsule())
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
-                    .pickerStyle(.segmented)
-                    .onChange(of: filterType) { _, _ in
-                        selectedValue = ""
-                    }
+                    Spacer()
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
 
-                // Value picker
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Select \(filterType.rawValue.lowercased())")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    if availableValues.isEmpty {
-                        Text("No \(filterType.rawValue.lowercased())s found in your commands.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .padding(.vertical, 8)
-                    } else {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 2) {
-                                ForEach(availableValues, id: \.self) { value in
-                                    Button {
-                                        selectedValue = value
-                                        if customTitle.isEmpty {
-                                            customTitle = value
-                                        }
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: selectedValue == value ? "checkmark.circle.fill" : "circle")
-                                                .foregroundStyle(selectedValue == value ? .blue : .secondary)
-                                                .font(.body)
-                                            Text(value)
-                                                .font(.subheadline)
-                                                .foregroundStyle(.primary)
-                                            Spacer()
-                                        }
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            selectedValue == value
-                                                ? Color.accentColor.opacity(0.08)
-                                                : Color.clear,
-                                            in: RoundedRectangle(cornerRadius: 6)
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 160)
-                    }
-                }
-
-                // Custom title
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Section title")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    TextField("e.g. Docker Commands", text: $customTitle)
-                        .textFieldStyle(.roundedBorder)
-                }
+                valueListContent
             }
-            .padding(20)
 
-            Spacer()
+            // Custom title
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Section title")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextField("e.g. Docker Commands", text: $customTitle)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
+            // Footer
             Divider()
             HStack(spacing: 10) {
                 Button("Cancel") { onCancel() }
@@ -558,7 +591,7 @@ private struct AddSectionSheet: View {
                 Spacer()
                 Button("Add Section") {
                     let filter: LayoutSectionFilter
-                    switch filterType {
+                    switch selectedTab {
                     case .tag:     filter = .tag(selectedValue)
                     case .project: filter = .project(selectedValue)
                     case .tool:    filter = .tool(selectedValue)
@@ -576,6 +609,69 @@ private struct AddSectionSheet: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .frame(width: 400, height: 440)
+        .frame(width: 400, height: 480)
+    }
+
+    @ViewBuilder
+    private var valueListContent: some View {
+        if availableValues.isEmpty {
+            let iconName = selectedTab == .tag ? "tag" : selectedTab == .project ? "folder" : "wrench"
+            VStack(spacing: 6) {
+                Image(systemName: iconName)
+                    .font(.system(size: 24))
+                    .foregroundStyle(.tertiary)
+                Text("No \(selectedTab.rawValue.lowercased())s found")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Add a \(selectedTab.rawValue.lowercased()) to your commands first.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if filteredValues.isEmpty {
+            ContentUnavailableView.search(text: searchText)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(filteredValues, id: \.self) { value in
+                    valueRow(value)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    @ViewBuilder
+    private func valueRow(_ value: String) -> some View {
+        let isSelected = selectedValue == value
+        HStack(spacing: 10) {
+            Text(value)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+        )
+        .listRowSeparator(.hidden)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedValue = value
+            if customTitle.isEmpty {
+                customTitle = value
+            }
+        }
     }
 }

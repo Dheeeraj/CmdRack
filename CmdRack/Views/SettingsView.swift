@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var modifiers: NSEvent.ModifierFlags = []
     @State private var hasPermission = false
     @State private var showClearDataConfirmation = false
+    @State private var showClearActivityConfirmation = false
     @State private var clearDataError: String?
     @State private var settings = AppSettings.load()
     @State private var settingsSaveTask: DispatchWorkItem?
@@ -272,76 +273,6 @@ struct SettingsView: View {
                     Text("These limits apply when creating or editing commands. Upper bound is capped to SQLite TEXT max (\(AppSettings.sqliteTextMax)). These settings sync via backup/restore.")
                 }
 
-                // ── 5. Backup & Restore ─────────────────────────────
-                Section {
-                    // --- Export ---
-                    Button {
-                        exportBackup()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "arrow.up.doc")
-                                .font(.body)
-                                .foregroundStyle(.blue)
-                                .frame(width: 24, alignment: .center)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Create Snapshot")
-                                    .font(.subheadline.weight(.medium))
-                                Text("Save all commands, settings, and activity to a compressed .cmdrack file.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                            Spacer()
-                            if isExporting {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isExporting)
-
-                    // --- Import ---
-                    Button {
-                        chooseImportFile()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "arrow.down.doc")
-                                .font(.body)
-                                .foregroundStyle(.green)
-                                .frame(width: 24, alignment: .center)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Restore from Snapshot")
-                                    .font(.subheadline.weight(.medium))
-                                Text("Open a .cmdrack file to restore data on this Mac.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                            Spacer()
-                            if isImporting {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isImporting)
-                } header: {
-                    Text("Backup & Restore")
-                } footer: {
-                    Text("Snapshots are compressed and use the .cmdrack extension. Share the file across Macs to migrate your setup.")
-                }
 
                 // ── 5b. Share Commands ────────────────────────────────
                 Section {
@@ -414,6 +345,77 @@ struct SettingsView: View {
                     Text("Share packs contain only commands — no analytics, settings, or usage data. Duplicate commands (same command text) are skipped on import.")
                 }
 
+                                // ── 5. Backup & Restore ─────────────────────────────
+                Section {
+                    // --- Export ---
+                    Button {
+                        exportBackup()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.up.doc")
+                                .font(.body)
+                                .foregroundStyle(.blue)
+                                .frame(width: 24, alignment: .center)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Create Snapshot")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Save all commands, settings, and activity to a compressed .cmdrack file.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            if isExporting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isExporting)
+
+                    // --- Import ---
+                    Button {
+                        chooseImportFile()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "arrow.down.doc")
+                                .font(.body)
+                                .foregroundStyle(.green)
+                                .frame(width: 24, alignment: .center)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Restore from Snapshot")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Open a .cmdrack file to restore data on this Mac.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            if isImporting {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isImporting)
+                } header: {
+                    Text("Backup & Restore")
+                } footer: {
+                    Text("Snapshots are compressed and use the .cmdrack extension. Share the file across Macs to migrate your setup.")
+                }
+
                 // ── 6. Data management ──────────────────────────────
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
@@ -428,7 +430,7 @@ struct SettingsView: View {
                     Button(role: .destructive) {
                         showClearDataConfirmation = true
                     } label: {
-                        Label("Clear all commands", systemImage: "trash")
+                        Label("Clear all data", systemImage: "trash")
                     }
                     .padding(.top, 2)
                 } header: {
@@ -469,13 +471,22 @@ struct SettingsView: View {
 
         // MARK: - Alerts
 
-        .alert("Clear all commands?", isPresented: $showClearDataConfirmation) {
+        .alert("Clear all data?", isPresented: $showClearDataConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Clear all", role: .destructive) {
-                clearAllCommands()
+                clearCommandsAndLayouts()
+                showClearActivityConfirmation = true
             }
         } message: {
-            Text("This will permanently delete every command. You cannot undo this.")
+            Text("This will permanently delete all commands and layouts. You cannot undo this.")
+        }
+        .alert("Also clear activity data?", isPresented: $showClearActivityConfirmation) {
+            Button("Keep Activity", role: .cancel) { }
+            Button("Clear Activity", role: .destructive) {
+                clearActivityData()
+            }
+        } message: {
+            Text("Activity data tracks your command usage and copy history. Would you like to clear it too?")
         }
         .alert("Could not clear data", isPresented: Binding(
             get: { clearDataError != nil },
@@ -592,10 +603,22 @@ struct SettingsView: View {
 
     // MARK: - Helpers
 
-    private func clearAllCommands() {
+    private func clearCommandsAndLayouts() {
         let repo = CommandRepository()
         do {
             try repo.deleteAll()
+            // Clear layouts and active layout
+            settings.layouts = []
+            settings.activeLayoutId = nil
+            settings.save()
+        } catch {
+            clearDataError = error.localizedDescription
+        }
+    }
+
+    private func clearActivityData() {
+        do {
+            try DatabaseService.shared.deleteAllAnalyticsEvents()
         } catch {
             clearDataError = error.localizedDescription
         }
