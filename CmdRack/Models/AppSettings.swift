@@ -65,6 +65,14 @@ struct AppSettings: Codable, Equatable {
     /// Keys reserved by the app for fixed actions (Add Command, Manage, Quit, Tab).
     static let reservedKeys: Set<String> = ["=", "m", "⌫"]
 
+    // MARK: - Layouts
+
+    /// Custom layouts that replace the default pinned+recent view in the popup.
+    var layouts: [LayoutConfiguration] = []
+
+    /// ID of the currently active layout. `nil` = default (pinned+recent).
+    var activeLayoutId: UUID? = nil
+
     // MARK: - Shortcut groups
 
     enum ShortcutGroup { case pinned, recent, search }
@@ -88,6 +96,26 @@ struct AppSettings: Codable, Equatable {
             return "\"\(key)\" is already used by Search result shortcuts (slot \(idx + 1))."
         }
 
+        return nil
+    }
+
+    /// Returns a conflict description when editing shortcut keys inside a layout.
+    /// Layout keys only conflict with reserved keys, search shortcuts, and same-layout duplicates
+    /// (layouts replace pinned+recent, so those groups don't conflict).
+    func layoutConflictDescription(for key: String, in layout: LayoutConfiguration, excludingIndex: Int) -> String? {
+        let k = key.lowercased()
+
+        if Self.reservedKeys.contains(k) {
+            return "\"\(key)\" is reserved by the app."
+        }
+        if let idx = searchResultShortcutKeys.firstIndex(where: { $0.lowercased() == k }) {
+            return "\"\(key)\" is already used by Search result shortcuts (slot \(idx + 1))."
+        }
+        for (idx, existing) in layout.shortcutKeys.enumerated() where idx != excludingIndex {
+            if existing.lowercased() == k {
+                return "\"\(key)\" is already used in slot \(idx + 1) of this layout."
+            }
+        }
         return nil
     }
 
@@ -137,6 +165,17 @@ struct AppSettings: Codable, Equatable {
         }
         if !searchSet.isDisjoint(with: Self.reservedKeys) {
             copy.searchResultShortcutKeys = ["z", "x"]
+        }
+
+        // Layouts: prune stale activeLayoutId, cap shortcut keys at 30
+        if let activeId = copy.activeLayoutId,
+           !copy.layouts.contains(where: { $0.id == activeId }) {
+            copy.activeLayoutId = nil
+        }
+        for i in copy.layouts.indices {
+            if copy.layouts[i].shortcutKeys.count > 30 {
+                copy.layouts[i].shortcutKeys = Array(copy.layouts[i].shortcutKeys.prefix(30))
+            }
         }
 
         return copy

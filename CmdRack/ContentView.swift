@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var recentCopiedVersion = 0
     @State private var settings = AppSettings.load()
     @State private var searchShortcutMonitor: Any?
+    @State private var activeLayoutIndex: Int = -1   // -1 = default (pinned+recent), 0..N = custom layout
     @State private var databaseError: String?
 
     private let repository = CommandRepository()
@@ -205,16 +206,47 @@ struct ContentView: View {
                 .transition(.opacity)
             }
 
-            
-
-            if hasPinnedSection && hasRecentSection {
-                PinnedCommandsView()
-                Divider()
+            // Layout indicator (only shown when custom layouts exist)
+            if !settings.layouts.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(activeLayoutName)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
+                )
             }
-  
 
-            if hasPinnedSection || hasRecentSection {
-                RecentCommandsView()
+            // Command sections: default (pinned+recent) or custom layout
+            if activeLayoutIndex == -1 {
+                if hasPinnedSection && hasRecentSection {
+                    PinnedCommandsView()
+                    Divider()
+                }
+
+                if hasPinnedSection || hasRecentSection {
+                    RecentCommandsView()
+                    Divider()
+                }
+            } else if activeLayoutIndex >= 0, activeLayoutIndex < settings.layouts.count {
+                LayoutContentView(
+                    layout: settings.layouts[activeLayoutIndex],
+                    allCommands: allCommands,
+                    onCopy: copyAndToast
+                )
                 Divider()
             }
 
@@ -262,8 +294,37 @@ struct ContentView: View {
         }
         .padding()
         .frame(width: 340)
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.leftArrow) {
+            guard !isSearchActive, !settings.layouts.isEmpty else { return .ignored }
+            let layoutCount = settings.layouts.count
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if activeLayoutIndex <= -1 {
+                    activeLayoutIndex = layoutCount - 1
+                } else {
+                    activeLayoutIndex -= 1
+                }
+            }
+            persistActiveLayout()
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            guard !isSearchActive, !settings.layouts.isEmpty else { return .ignored }
+            let layoutCount = settings.layouts.count
+            withAnimation(.easeInOut(duration: 0.15)) {
+                if activeLayoutIndex >= layoutCount - 1 {
+                    activeLayoutIndex = -1
+                } else {
+                    activeLayoutIndex += 1
+                }
+            }
+            persistActiveLayout()
+            return .handled
+        }
         .onAppear {
             loadCommands()
+            syncLayoutIndex()
             if let error = DatabaseService.shared.initError {
                 databaseError = error.localizedDescription
             }
@@ -284,7 +345,8 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackSettingsDidChange)) { _ in
             settings = AppSettings.load()
-            // Recreate the monitor so the closure captures fresh settings
+            syncLayoutIndex()
+            // Recreate the search monitor so the closure captures fresh settings
             if isSearchActive {
                 stopSearchShortcutMonitor()
                 startSearchShortcutMonitorIfNeeded()
@@ -314,6 +376,34 @@ struct ContentView: View {
                     .zIndex(1000)
             }
         }
+    }
+
+    /// Display name for the current layout.
+    private var activeLayoutName: String {
+        if activeLayoutIndex == -1 { return "Default" }
+        guard activeLayoutIndex >= 0, activeLayoutIndex < settings.layouts.count else { return "Default" }
+        return settings.layouts[activeLayoutIndex].name
+    }
+
+    /// Derives the layout index from the persisted `activeLayoutId`.
+    private func syncLayoutIndex() {
+        if let activeId = settings.activeLayoutId,
+           let idx = settings.layouts.firstIndex(where: { $0.id == activeId }) {
+            activeLayoutIndex = idx
+        } else {
+            activeLayoutIndex = -1
+        }
+    }
+
+    /// Persists the current layout selection.
+    private func persistActiveLayout() {
+        if activeLayoutIndex == -1 {
+            settings.activeLayoutId = nil
+        } else if activeLayoutIndex >= 0, activeLayoutIndex < settings.layouts.count {
+            settings.activeLayoutId = settings.layouts[activeLayoutIndex].id
+        }
+        settings.save()
+        NotificationCenter.default.post(name: .cmdRackLayoutDidChange, object: nil)
     }
 
     private func loadCommands() {
