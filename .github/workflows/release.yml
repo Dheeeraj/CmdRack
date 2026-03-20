@@ -114,10 +114,12 @@ jobs:
 
           # Sign the zip using stdin pipe as recommended by Sparkle docs
           # -f - reads key from stdin, -p outputs just the raw signature
+          # Trim any whitespace/newlines from the secret (GitHub may add trailing newline)
+          CLEAN_KEY=$(echo -n "$SPARKLE_PRIVATE_KEY" | tr -d '[:space:]')
           echo "Running sign_update..."
-          echo "Key length: ${#SPARKLE_PRIVATE_KEY} chars"
+          echo "Key length: ${#CLEAN_KEY} chars"
 
-          SIGN_OUTPUT=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - -p "$ZIP_PATH" 2>&1) || true
+          SIGN_OUTPUT=$(printf '%s' "$CLEAN_KEY" | "$SIGN_UPDATE" --ed-key-file - -p "$ZIP_PATH" 2>&1) || true
           echo "sign_update output: $SIGN_OUTPUT"
 
           # With -p flag, output is just the raw signature
@@ -126,7 +128,7 @@ jobs:
           # If -p didn't work, try without -p and parse the XML attribute
           if [ -z "$SIGNATURE" ]; then
             echo "Retrying without -p flag..."
-            SIGN_OUTPUT2=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - "$ZIP_PATH" 2>&1) || true
+            SIGN_OUTPUT2=$(printf '%s' "$CLEAN_KEY" | "$SIGN_UPDATE" --ed-key-file - "$ZIP_PATH" 2>&1) || true
             echo "sign_update output (no -p): $SIGN_OUTPUT2"
             SIGNATURE=$(echo "$SIGN_OUTPUT2" | grep -oE 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//' || true)
           fi
