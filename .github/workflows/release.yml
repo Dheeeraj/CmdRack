@@ -149,6 +149,9 @@ jobs:
           # Remove leading whitespace from heredoc
           sed -i '' 's/^          //' build/releases/appcast.xml
 
+          # Clean up
+          rm -f "$KEY_FILE"
+
           echo "✅ appcast.xml generated:"
           cat build/releases/appcast.xml
 
