@@ -2,7 +2,7 @@ name: Build & Release
 
 on:
   push:
-    branches: [main]
+    branches: ['*']
 
 # Only one release at a time
 concurrency:
@@ -117,12 +117,26 @@ jobs:
           KEY_FILE=$(mktemp)
           printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
 
-          # Sign the zip with -p flag for raw signature output
-          echo "Running sign_update -p ..."
-          SIGNATURE=$("$SIGN_UPDATE" -p "$ZIP_PATH" -f "$KEY_FILE" 2>/dev/null)
+          # Debug: show sign_update usage to understand flags
+          echo "sign_update help:"
+          "$SIGN_UPDATE" --help 2>&1 || true
+
+          # Sign the zip — capture all output
+          echo "Running sign_update..."
+          SIGN_OUTPUT=$("$SIGN_UPDATE" "$ZIP_PATH" -f "$KEY_FILE" 2>&1) || true
+          echo "Raw output: $SIGN_OUTPUT"
 
           # Clean up key file immediately
           rm -f "$KEY_FILE"
+
+          # Parse signature from output formats:
+          # Format 1: sparkle:edSignature="ABC123==" length="12345"
+          # Format 2: just the raw base64 string
+          SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -oE 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//' || true)
+          if [ -z "$SIGNATURE" ]; then
+            # Fallback: take first non-empty line that looks like base64
+            SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -E '^[A-Za-z0-9+/=]{40,}$' | head -1 || true)
+          fi
 
           LENGTH=$(stat -f%z "$ZIP_PATH")
 
@@ -131,6 +145,7 @@ jobs:
 
           if [ -z "$SIGNATURE" ]; then
             echo "❌ Failed to generate signature"
+            echo "Full output was: $SIGN_OUTPUT"
             exit 1
           fi
 
