@@ -7,6 +7,7 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 import ServiceManagement
+import Sparkle
 
 struct SettingsView: View {
     @ObservedObject private var shortcutService = GlobalShortcutService.shared
@@ -61,10 +62,31 @@ struct SettingsView: View {
                 Section {
                     SettingsStyleRow(
                         title: "Version",
-                        subtitle: "1.0",
+                        subtitle: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                         showChevron: false,
                         action: nil
                     )
+
+                    if let appDelegate = NSApp.delegate as? AppDelegate, appDelegate.isUpdaterStarted {
+                        Button {
+                            appDelegate.updaterController.updater.checkForUpdates()
+                        } label: {
+                            HStack {
+                                Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+                                Spacer()
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Automatically check for updates", isOn: Binding(
+                                get: { appDelegate.updaterController.updater.automaticallyChecksForUpdates },
+                                set: { appDelegate.updaterController.updater.automaticallyChecksForUpdates = $0 }
+                            ))
+                            Text("Periodically check for new versions in the background.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle("Launch at login", isOn: $launchAtLogin)

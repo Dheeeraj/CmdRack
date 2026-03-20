@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Sparkle
 
 @main
 struct CmdRackApp: App {
@@ -65,10 +66,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set to true when opening from global shortcut so we can record the correct analytics trigger.
     private var openingViaShortcut = false
 
+    /// Sparkle updater controller — manages automatic update checks and UI.
+    let updaterController: SPUStandardUpdaterController
+    /// Whether the updater was successfully started (feed URL is configured).
+    private(set) var isUpdaterStarted = false
+
+    override init() {
+        // Don't start the updater automatically — it will crash if SUFeedURL
+        // is not yet configured. The updater is started manually once the
+        // feed URL is set (see applicationDidFinishLaunching).
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: false,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+        super.init()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
         setupPopover()
         setupGlobalShortcut()
+        setupSparkle()
 
         NotificationCenter.default.addObserver(
             self,
@@ -97,6 +116,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 340, height: 260)
         popover.contentViewController = NSHostingController(rootView: ContentView())
+    }
+
+    private func setupSparkle() {
+        // TODO: Replace with your actual appcast URL once you have one.
+        // Example: "https://raw.githubusercontent.com/<user>/CmdRack/main/appcast.xml"
+        let feedURLString = Bundle.main.infoDictionary?["SUFeedURL"] as? String
+
+        if let urlString = feedURLString, let url = URL(string: urlString) {
+            updaterController.updater.setFeedURL(url)
+            do {
+                try updaterController.updater.start()
+                isUpdaterStarted = true
+            } catch {
+                print("[Sparkle] Failed to start updater: \(error)")
+            }
+        } else {
+            print("[Sparkle] No SUFeedURL configured — updater not started. Add SUFeedURL to Info.plist when ready.")
+        }
     }
 
     private func setupGlobalShortcut() {

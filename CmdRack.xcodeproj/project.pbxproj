@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		EB84C6F52F4C7584006F85E1 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB84C6D72F4C6A6F006F85E1 /* GRDB */; };
+		EBF9D1982F6D448600702086 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = EBF9D1972F6D448600702086 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EB84C6F52F4C7584006F85E1 /* GRDB in Frameworks */,
+				EBF9D1982F6D448600702086 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +120,7 @@
 			name = CmdRack;
 			packageProductDependencies = (
 				EB84C6D72F4C6A6F006F85E1 /* GRDB */,
+				EBF9D1972F6D448600702086 /* Sparkle */,
 			);
 			productName = CmdRack;
 			productReference = EBC8F0362F397CBE0091540F /* CmdRack.app */;
@@ -203,6 +206,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */,
+				EBF9D1962F6D448600702086 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EBC8F0372F397CBE0091540F /* Products */;
@@ -596,6 +600,14 @@
 				kind = branch;
 			};
 		};
+		EBF9D1962F6D448600702086 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -603,6 +615,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
+		};
+		EBF9D1972F6D448600702086 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EBF9D1962F6D448600702086 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
