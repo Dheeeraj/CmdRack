@@ -113,11 +113,20 @@ jobs:
           echo "Found sign_update at: $SIGN_UPDATE"
           chmod +x "$SIGN_UPDATE"
 
-          # Sign the zip with EdDSA — pass private key via stdin
-          SIGNATURE=$(echo -n "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" "$ZIP_PATH" --ed-key-file - | grep edSignature | sed 's/.*edSignature="\([^"]*\)".*/\1/')
+          # Write private key to temp file (no trailing newline)
+          KEY_FILE=$(mktemp)
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+
+          # Sign the zip with -p flag for raw signature output
+          echo "Running sign_update -p ..."
+          SIGNATURE=$("$SIGN_UPDATE" -p "$ZIP_PATH" -f "$KEY_FILE" 2>/dev/null)
+
+          # Clean up key file immediately
+          rm -f "$KEY_FILE"
+
           LENGTH=$(stat -f%z "$ZIP_PATH")
 
-          echo "EdDSA signature: $SIGNATURE"
+          echo "EdDSA signature: ${SIGNATURE:0:5}... (truncated)"
           echo "File length: $LENGTH"
 
           if [ -z "$SIGNATURE" ]; then
@@ -126,6 +135,7 @@ jobs:
           fi
 
           # Build appcast.xml
+          mkdir -p build/releases
           cat > build/releases/appcast.xml << APPCAST_EOF
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -149,9 +159,6 @@ jobs:
 
           # Remove leading whitespace from heredoc
           sed -i '' 's/^          //' build/releases/appcast.xml
-
-          # Clean up
-          rm -f "$KEY_FILE"
 
           echo "✅ appcast.xml generated:"
           cat build/releases/appcast.xml
