@@ -127,6 +127,9 @@ jobs:
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/" \
             build/releases/
 
+          # Clean up
+          rm -f "$KEY_FILE"
+
           echo "✅ appcast.xml generated:"
           cat build/releases/appcast.xml
 
