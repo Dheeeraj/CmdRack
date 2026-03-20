@@ -34,9 +34,22 @@
 		EBC8F04D2F397CC00091540F /* CmdRackUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CmdRackUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EBF9D19C2F6D4BB900702086 /* Exceptions for "CmdRack" folder in "CmdRack" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EBC8F0352F397CBE0091540F /* CmdRack */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EBC8F0382F397CBE0091540F /* CmdRack */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EBF9D19C2F6D4BB900702086 /* Exceptions for "CmdRack" folder in "CmdRack" target */,
+			);
 			path = CmdRack;
 			sourceTree = "<group>";
 		};
@@ -416,6 +429,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CmdRack/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "CmdRack needs permission to send commands to your terminal app.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -450,6 +464,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CmdRack/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "CmdRack needs permission to send commands to your terminal app.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
