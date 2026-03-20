@@ -90,7 +90,8 @@ jobs:
       - name: Sign zip & generate appcast
         if: steps.check_tag.outputs.exists == 'false'
         env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          # Sparkle's generate_appcast reads the EdDSA key from this env var
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BUILD="${{ steps.version.outputs.build }}"
