@@ -124,11 +124,18 @@ jobs:
             cp appcast.xml build/releases/
           fi
 
-          # Generate/update the appcast — reads SPARKLE_PRIVATE_KEY from env
+          # Write the private key to a temp file (no trailing newline)
+          KEY_FILE=$(mktemp)
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+
+          # Generate/update the appcast
           "$GENERATE_APPCAST" \
-            --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") \
+            --ed-key-file "$KEY_FILE" \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/" \
             build/releases/
+
+          # Clean up
+          rm -f "$KEY_FILE"
 
           echo "✅ appcast.xml generated:"
           cat build/releases/appcast.xml
