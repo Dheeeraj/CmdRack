@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>CmdRack Updates</title>
+    <item>
+      <title>Version 1.0</title>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+      <pubDate>Fri, 20 Mar 2026 10:51:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/Dheeeraj/CmdRack/releases/download/v1.0/CmdRack-1.0.zip"
+        length="2877607"
+        type="application/octet-stream"
+        sparkle:edSignature="05R6Y4a+43cIXRbc0ur9CIfHoLOfRyDYyZrelFIenNGmORiQ+/bt1HKmQijrjMhoM71zShHQGRKR27J+HJv4Aw=="
+      />
+    </item>
+  </channel>
+</rss>
