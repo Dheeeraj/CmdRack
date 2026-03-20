@@ -1,0 +1,32 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+xcuserdata/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# SPM
+.build/
+Package.resolved
+
+# Archives
+*.xcarchive
+
+# App bundles
+*.app
+*.ipa
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Secrets — never commit
+*.p12
+*.mobileprovision
+*.provisionprofile

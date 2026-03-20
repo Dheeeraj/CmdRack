@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EB84C6F52F4C7584006F85E1 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB84C6D72F4C6A6F006F85E1 /* GRDB */; };
+		EBF9D1982F6D448600702086 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = EBF9D1972F6D448600702086 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		EBC8F0442F397CC00091540F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,9 +34,22 @@
 		EBC8F04D2F397CC00091540F /* CmdRackUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CmdRackUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EBF9D19C2F6D4BB900702086 /* Exceptions for "CmdRack" folder in "CmdRack" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EBC8F0352F397CBE0091540F /* CmdRack */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EBC8F0382F397CBE0091540F /* CmdRack */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EBF9D19C2F6D4BB900702086 /* Exceptions for "CmdRack" folder in "CmdRack" target */,
+			);
 			path = CmdRack;
 			sourceTree = "<group>";
 		};
@@ -52,6 +70,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB84C6F52F4C7584006F85E1 /* GRDB in Frameworks */,
+				EBF9D1982F6D448600702086 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +132,8 @@
 			);
 			name = CmdRack;
 			packageProductDependencies = (
+				EB84C6D72F4C6A6F006F85E1 /* GRDB */,
+				EBF9D1972F6D448600702086 /* Sparkle */,
 			);
 			productName = CmdRack;
 			productReference = EBC8F0362F397CBE0091540F /* CmdRack.app */;
@@ -195,6 +217,10 @@
 			);
 			mainGroup = EBC8F02D2F397CBE0091540F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */,
+				EBF9D1962F6D448600702086 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EBC8F0372F397CBE0091540F /* Products */;
 			projectDirPath = "";
@@ -398,11 +424,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7246943BLU;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CmdRack/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "CmdRack needs permission to send commands to your terminal app.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -430,11 +459,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7246943BLU;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CmdRack/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "CmdRack needs permission to send commands to your terminal app.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -573,6 +605,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+		EBF9D1962F6D448600702086 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EB84C6D72F4C6A6F006F85E1 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EB84C6D62F4C6A6F006F85E1 /* XCRemoteSwiftPackageReference "GRDB" */;
+			productName = GRDB;
+		};
+		EBF9D1972F6D448600702086 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EBF9D1962F6D448600702086 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EBC8F02E2F397CBE0091540F /* Project object */;
 }

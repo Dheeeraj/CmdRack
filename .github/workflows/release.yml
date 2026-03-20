@@ -1,0 +1,168 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+
+# Only one release at a time
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Resolve SPM dependencies
+        run: |
+          xcodebuild -project CmdRack.xcodeproj \
+            -scheme CmdRack \
+            -resolvePackageDependencies
+
+      - name: Read version from project
+        id: version
+        run: |
+          VERSION=$(xcodebuild -project CmdRack.xcodeproj \
+            -scheme CmdRack \
+            -showBuildSettings 2>/dev/null \
+            | grep MARKETING_VERSION \
+            | head -1 \
+            | awk '{print $3}')
+          BUILD=$(xcodebuild -project CmdRack.xcodeproj \
+            -scheme CmdRack \
+            -showBuildSettings 2>/dev/null \
+            | grep CURRENT_PROJECT_VERSION \
+            | head -1 \
+            | awk '{print $3}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION (build $BUILD)"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          if git rev-parse "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Tag ${{ steps.version.outputs.tag }} already exists — skipping release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Archive app
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          xcodebuild -project CmdRack.xcodeproj \
+            -scheme CmdRack \
+            -configuration Release \
+            -archivePath build/CmdRack.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export app from archive
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          # Copy the .app out of the archive
+          mkdir -p build/export
+          cp -R "build/CmdRack.xcarchive/Products/Applications/CmdRack.app" build/export/
+
+      - name: Create zip
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          cd build/export
+          ditto -c -k --keepParent CmdRack.app "CmdRack-${{ steps.version.outputs.version }}.zip"
+          ls -lh "CmdRack-${{ steps.version.outputs.version }}.zip"
+
+      - name: Sign with Sparkle & generate appcast
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Find generate_appcast from SPM artifacts
+          GENERATE_APPCAST=$(find ~/Library/Developer/Xcode/DerivedData \
+            -name "generate_appcast" \
+            -path "*/Sparkle/*" \
+            -type f 2>/dev/null | head -1)
+
+          if [ -z "$GENERATE_APPCAST" ]; then
+            # Fallback: check the SourcePackages in the build
+            GENERATE_APPCAST=$(find build -name "generate_appcast" -type f 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$GENERATE_APPCAST" ]; then
+            echo "❌ Could not find generate_appcast tool"
+            exit 1
+          fi
+
+          echo "Found generate_appcast at: $GENERATE_APPCAST"
+          chmod +x "$GENERATE_APPCAST"
+
+          # Set the download URL prefix for the appcast
+          export SPARKLE_DOWNLOAD_URL_PREFIX="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/"
+
+          # Create releases dir with just the new zip
+          mkdir -p build/releases
+          cp "build/export/CmdRack-${{ steps.version.outputs.version }}.zip" build/releases/
+
+          # If appcast.xml exists in repo, copy it so generate_appcast appends to it
+          if [ -f appcast.xml ]; then
+            cp appcast.xml build/releases/
+          fi
+
+          # Generate/update the appcast — reads SPARKLE_PRIVATE_KEY from env
+          "$GENERATE_APPCAST" \
+            --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/" \
+            build/releases/
+
+          echo "✅ appcast.xml generated:"
+          cat build/releases/appcast.xml
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: CmdRack ${{ steps.version.outputs.version }}
+          body: |
+            ## CmdRack ${{ steps.version.outputs.version }}
+
+            ### Installation
+            1. Download `CmdRack-${{ steps.version.outputs.version }}.zip` below
+            2. Unzip and drag `CmdRack.app` to your Applications folder
+            3. Launch CmdRack — it will appear in your menu bar
+
+            *Built from commit ${{ github.sha }}*
+          files: |
+            build/export/CmdRack-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false
+
+      - name: Commit appcast.xml
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          cp build/releases/appcast.xml appcast.xml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          if git diff --cached --quiet; then
+            echo "No changes to appcast.xml"
+          else
+            git commit -m "Update appcast.xml for v${{ steps.version.outputs.version }}"
+            git push
+          fi
