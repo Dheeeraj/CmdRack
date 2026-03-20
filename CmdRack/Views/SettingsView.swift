@@ -6,14 +6,17 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject private var shortcutService = GlobalShortcutService.shared
     @State private var keyCode: UInt16 = 0
     @State private var modifiers: NSEvent.ModifierFlags = []
     @State private var hasPermission = false
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var showClearDataConfirmation = false
     @State private var showClearActivityConfirmation = false
+    @State private var showResetSettingsConfirmation = false
     @State private var clearDataError: String?
     @State private var settings = AppSettings.load()
     @State private var settingsSaveTask: DispatchWorkItem?
@@ -62,6 +65,26 @@ struct SettingsView: View {
                         showChevron: false,
                         action: nil
                     )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Launch at login", isOn: $launchAtLogin)
+                            .onChange(of: launchAtLogin) { _, newValue in
+                                do {
+                                    if newValue {
+                                        try SMAppService.mainApp.register()
+                                    } else {
+                                        try SMAppService.mainApp.unregister()
+                                    }
+                                } catch {
+                                    // Revert on failure
+                                    launchAtLogin = !newValue
+                                    print("[Settings] Login item error: \(error)")
+                                }
+                            }
+                        Text("Automatically start CmdRack when you log in so it's always available in your menu bar.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 } header: {
                     Text("General")
                 }
@@ -504,10 +527,16 @@ struct SettingsView: View {
                 // ── 7. Debug ────────────────────────────────────────
                 Section {
                     Toggle("Force-unlock Activity tab (debug)", isOn: $settings.debugUnlockActivityTab)
+
+                    Button(role: .destructive) {
+                        showResetSettingsConfirmation = true
+                    } label: {
+                        Label("Reset All Settings to Defaults", systemImage: "arrow.counterclockwise")
+                    }
                 } header: {
                     Text("Debug")
                 } footer: {
-                    Text("For development only. When enabled, the Activity tab is available immediately without waiting 3 days after first install.")
+                    Text("For development only. The toggle unlocks the Activity tab immediately. The reset button restores all settings (tips, prompts, preferences) to factory defaults so you can re-test first-run experiences.")
                 }
 
             }
@@ -551,6 +580,21 @@ struct SettingsView: View {
             }
         } message: {
             Text("Activity data tracks your command usage and copy history. Would you like to clear it too?")
+        }
+        .alert("Reset all settings?", isPresented: $showResetSettingsConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                // Unregister login item
+                try? SMAppService.mainApp.unregister()
+                launchAtLogin = false
+
+                // Reset settings to factory defaults (preserves commands/activity data)
+                let fresh = AppSettings()
+                fresh.save()
+                settings = AppSettings.load()
+            }
+        } message: {
+            Text("This resets all preferences, tips, and prompts to factory defaults so you can re-test first-run experiences. Commands and activity data are not affected.")
         }
         .alert("Could not clear data", isPresented: Binding(
             get: { clearDataError != nil },

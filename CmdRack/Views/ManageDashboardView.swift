@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppKit
+import ServiceManagement
 
 enum DashboardSection: String, CaseIterable {
     case commands = "Commands"
@@ -27,6 +28,7 @@ struct ManageDashboardView: View {
     @State private var refreshCommandsID = 0
     @State private var focusPinnedTab = false
 
+    @State private var showLaunchAtLoginBanner: Bool = false
     @State private var activeSheet: ActiveSheet?
 
     private enum ActiveSheet: Identifiable {
@@ -135,6 +137,31 @@ struct ManageDashboardView: View {
         }
         .onAppear {
             bringWindowToFront()
+            // Show launch-at-login prompt if not yet dismissed and not already enabled
+            let settings = AppSettings.load()
+            if !settings.launchAtLoginPromptDismissed &&
+               SMAppService.mainApp.status != .enabled {
+                showLaunchAtLoginBanner = true
+            }
+        }
+        .alert("Stay in Your Menu Bar", isPresented: $showLaunchAtLoginBanner) {
+            Button("Enable") {
+                do {
+                    try SMAppService.mainApp.register()
+                } catch {
+                    print("[ManageDashboard] Failed to register login item: \(error)")
+                }
+                var s = AppSettings.load()
+                s.launchAtLoginPromptDismissed = true
+                s.save()
+            }
+            Button("Not Now", role: .cancel) {
+                var s = AppSettings.load()
+                s.launchAtLoginPromptDismissed = true
+                s.save()
+            }
+        } message: {
+            Text("Enable \"Launch at Login\" so CmdRack is always ready in your menu bar. You can change this later in Settings.")
         }
         .onReceive(NotificationCenter.default.publisher(for: .cmdRackSwitchToPinnedTab)) { _ in
             selectedSection = .commands

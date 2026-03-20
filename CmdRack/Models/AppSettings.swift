@@ -165,6 +165,9 @@ struct AppSettings: Codable, Equatable {
     /// Whether the terminal tip has been dismissed.
     var terminalTipDismissed: Bool = false
 
+    /// Whether the "Launch at login" prompt in Manage view has been dismissed.
+    var launchAtLoginPromptDismissed: Bool = false
+
     // MARK: - Shortcut groups
 
     enum ShortcutGroup { case pinned, recent, search }
