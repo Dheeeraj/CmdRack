@@ -91,7 +91,8 @@ jobs:
       - name: Sign with Sparkle & generate appcast
         if: steps.check_tag.outputs.exists == 'false'
         env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          # Sparkle's generate_appcast reads the EdDSA key from this env var
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           # Find generate_appcast from SPM artifacts
           GENERATE_APPCAST=$(find ~/Library/Developer/Xcode/DerivedData \
@@ -112,9 +113,6 @@ jobs:
           echo "Found generate_appcast at: $GENERATE_APPCAST"
           chmod +x "$GENERATE_APPCAST"
 
-          # Set the download URL prefix for the appcast
-          export SPARKLE_DOWNLOAD_URL_PREFIX="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/"
-
           # Create releases dir with just the new zip
           mkdir -p build/releases
           cp "build/export/CmdRack-${{ steps.version.outputs.version }}.zip" build/releases/
@@ -124,18 +122,10 @@ jobs:
             cp appcast.xml build/releases/
           fi
 
-          # Write the private key to a temp file (no trailing newline)
-          KEY_FILE=$(mktemp)
-          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
-
-          # Generate/update the appcast
+          # Generate/update the appcast — reads SPARKLE_KEY env var automatically
           "$GENERATE_APPCAST" \
-            --ed-key-file "$KEY_FILE" \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/" \
             build/releases/
-
-          # Clean up
-          rm -f "$KEY_FILE"
 
           echo "✅ appcast.xml generated:"
           cat build/releases/appcast.xml
