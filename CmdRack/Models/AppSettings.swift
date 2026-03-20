@@ -4,6 +4,84 @@
 //
 
 import Foundation
+import AppKit
+import SwiftUI
+
+// MARK: - Preferred terminal
+
+enum PreferredTerminal: String, Codable, CaseIterable, Equatable {
+    case terminal   = "Terminal"
+    case iterm2     = "iTerm2"
+    case warp       = "Warp"
+    case kitty      = "Kitty"
+    case ghostty    = "Ghostty"
+    case alacritty  = "Alacritty"
+
+    /// The macOS bundle identifier.
+    var bundleIdentifier: String {
+        switch self {
+        case .terminal:  return "com.apple.Terminal"
+        case .iterm2:    return "com.googlecode.iterm2"
+        case .warp:      return "dev.warp.Warp-Stable"
+        case .kitty:     return "net.kovidgoyal.kitty"
+        case .ghostty:   return "com.mitchellh.ghostty"
+        case .alacritty: return "org.alacritty"
+        }
+    }
+
+    /// Display name shown in settings.
+    var displayName: String { rawValue }
+
+    /// Whether this terminal app is installed on the current Mac.
+    var isInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil
+    }
+
+    /// Returns only the terminals that are actually installed.
+    static var installed: [PreferredTerminal] {
+        allCases.filter { $0.isInstalled }
+    }
+}
+
+// MARK: - Shortcut action & modifier
+
+/// What pressing a bare shortcut key does.
+enum ShortcutAction: String, Codable, CaseIterable, Equatable {
+    case copy    = "Copy"
+    case run     = "Run in Terminal"
+
+    var displayName: String { rawValue }
+}
+
+/// Which modifier key triggers the alternate shortcut action.
+enum TerminalModifierKey: String, Codable, CaseIterable, Equatable {
+    case control = "Control"
+    case shift   = "Shift"
+    case command = "Command"
+    case option  = "Option"
+
+    var displayName: String { rawValue }
+
+    /// The symbol shown in UI.
+    var symbol: String {
+        switch self {
+        case .control: return "⌃"
+        case .shift:   return "⇧"
+        case .command: return "⌘"
+        case .option:  return "⌥"
+        }
+    }
+
+    /// Maps to SwiftUI's EventModifiers.
+    var eventModifier: SwiftUI.EventModifiers {
+        switch self {
+        case .control: return .control
+        case .shift:   return .shift
+        case .command: return .command
+        case .option:  return .option
+        }
+    }
+}
 
 /// App-wide settings persisted in UserDefaults as JSON.
 /// Add new properties with a default value to extend without breaking existing installs.
@@ -72,6 +150,20 @@ struct AppSettings: Codable, Equatable {
 
     /// ID of the currently active layout. `nil` = default (pinned+recent).
     var activeLayoutId: UUID? = nil
+
+    // MARK: - Terminal
+
+    /// The terminal app to use when running commands with modifier+shortcut key.
+    var preferredTerminal: PreferredTerminal = .terminal
+
+    /// What pressing a bare shortcut key does: copy command or run in terminal.
+    var defaultShortcutAction: ShortcutAction = .copy
+
+    /// Which modifier key triggers the alternate action.
+    var terminalModifierKey: TerminalModifierKey = .control
+
+    /// Whether the terminal tip has been dismissed.
+    var terminalTipDismissed: Bool = false
 
     // MARK: - Shortcut groups
 
@@ -165,6 +257,11 @@ struct AppSettings: Codable, Equatable {
         }
         if !searchSet.isDisjoint(with: Self.reservedKeys) {
             copy.searchResultShortcutKeys = ["z", "x"]
+        }
+
+        // Terminal: fall back to Terminal.app if the saved choice is not installed
+        if !copy.preferredTerminal.isInstalled {
+            copy.preferredTerminal = .terminal
         }
 
         // Layouts: prune stale activeLayoutId, cap shortcut keys at 30

@@ -15,6 +15,8 @@ struct ContentView: View {
     @FocusState private var searchFocused: Bool
     @State private var allCommands: [CommandItem] = []
     @State private var showCopiedAlert = false
+    @State private var showRanInTerminalAlert = false
+    @State private var lastUsedTerminalName: String = ""
     @State private var recentCopiedVersion = 0
     @State private var settings = AppSettings.load()
     @State private var searchShortcutMonitor: Any?
@@ -230,6 +232,37 @@ struct ContentView: View {
                 )
             }
 
+            // One-time tip: modifier+key action
+            if !settings.terminalTipDismissed {
+                HStack(spacing: 6) {
+                    Image(systemName: "terminal")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(terminalTipText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            settings.terminalTipDismissed = true
+                            settings.save()
+                        }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.08))
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
             // Command sections: default (pinned+recent) or custom layout
             if activeLayoutIndex == -1 {
                 if hasPinnedSection && hasRecentSection {
@@ -322,6 +355,38 @@ struct ContentView: View {
             persistActiveLayout()
             return .handled
         }
+        .onKeyPress(phases: .down) { press in
+            guard !press.characters.isEmpty else { return .ignored }
+            let key = String(press.characters.prefix(1))
+            let map = shortcutKeyMap()
+            guard map[key.lowercased()] != nil else { return .ignored }
+
+            let modKey = settings.terminalModifierKey.eventModifier
+            let hasModifier = press.modifiers.contains(modKey)
+
+            if settings.defaultShortcutAction == .copy {
+                // Bare key = copy (handled by .keyboardShortcut on buttons)
+                // Modifier+key = run in terminal
+                if hasModifier {
+                    runInTerminal(key: key)
+                    return .handled
+                }
+            } else {
+                // Default is run: bare key = run, modifier+key = copy
+                if hasModifier {
+                    // Modifier+key → copy instead
+                    if let cmd = map[key.lowercased()] {
+                        copyAndToast(cmd)
+                        return .handled
+                    }
+                } else if press.modifiers.isEmpty {
+                    // Bare key → run in terminal (intercept before .keyboardShortcut)
+                    runInTerminal(key: key)
+                    return .handled
+                }
+            }
+            return .ignored
+        }
         .onAppear {
             loadCommands()
             syncLayoutIndex()
@@ -375,6 +440,32 @@ struct ContentView: View {
                     .transition(.scale.combined(with: .opacity))
                     .zIndex(1000)
             }
+            if showRanInTerminalAlert {
+                HStack(spacing: 6) {
+                    Image(systemName: "terminal")
+                        .font(.caption)
+                    Text("Sent to \(lastUsedTerminalName)")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(1000)
+            }
+        }
+    }
+
+    /// Tip text that adapts to the current action/modifier config.
+    private var terminalTipText: String {
+        let mod = settings.terminalModifierKey.symbol
+        if settings.defaultShortcutAction == .copy {
+            return "\(mod) + key runs in terminal"
+        } else {
+            return "Key runs in terminal · \(mod) + key copies"
         }
     }
 
@@ -419,6 +510,113 @@ struct ContentView: View {
         ClipboardService.copyAndDismiss(item)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             showCopiedAlert = false
+        }
+    }
+
+    // MARK: - Run in terminal (Ctrl+key)
+
+    /// Builds a map from shortcut key (lowercased) → CommandItem for the current view.
+    private func shortcutKeyMap() -> [String: CommandItem] {
+        var map: [String: CommandItem] = [:]
+
+        if activeLayoutIndex == -1 {
+            // Default view: pinned + recent
+            let pinnedCommands = allCommands
+                .filter { $0.pinned }
+                .prefix(settings.pinnedDisplayCount)
+
+            if settings.pinnedShortcutsEnabled {
+                for (i, cmd) in pinnedCommands.enumerated() {
+                    if i < settings.pinnedShortcutKeys.count {
+                        let key = settings.pinnedShortcutKeys[i].lowercased()
+                        if !key.isEmpty { map[key] = cmd }
+                    }
+                }
+            }
+
+            let recentIDs = RecentCopiedTracker.shared.ids
+            let allIDs = Set(allCommands.map(\.id))
+            let validRecentIDs = recentIDs.filter { allIDs.contains($0) }
+            let byID = Dictionary(uniqueKeysWithValues: allCommands.map { ($0.id, $0) })
+            let recentCommands = validRecentIDs.compactMap { byID[$0] }.prefix(settings.recentDisplayCount)
+
+            for (i, cmd) in recentCommands.enumerated() {
+                if i < settings.recentShortcutKeys.count {
+                    let key = settings.recentShortcutKeys[i].lowercased()
+                    if !key.isEmpty { map[key] = cmd }
+                }
+            }
+        } else if activeLayoutIndex >= 0, activeLayoutIndex < settings.layouts.count {
+            // Custom layout
+            let layout = settings.layouts[activeLayoutIndex]
+            var globalIndex = 0
+            for section in layout.sections {
+                let filtered: [CommandItem]
+                switch section.filter {
+                case .tag(let tag):
+                    filtered = allCommands.filter { $0.tags.contains(tag) }
+                case .project(let project):
+                    filtered = allCommands.filter { ($0.project ?? "") == project }
+                case .tool(let tool):
+                    filtered = allCommands.filter { ($0.tool ?? "") == tool }
+                }
+                let ordered = applyLayoutOrder(filtered, order: section.commandOrder)
+                for cmd in ordered {
+                    if globalIndex < layout.shortcutKeys.count {
+                        let key = layout.shortcutKeys[globalIndex].lowercased()
+                        if !key.isEmpty { map[key] = cmd }
+                    }
+                    globalIndex += 1
+                }
+            }
+        }
+
+        return map
+    }
+
+    /// Mirrors LayoutContentView.applyOrder — keeps ordering consistent.
+    private func applyLayoutOrder(_ commands: [CommandItem], order: [UUID]) -> [CommandItem] {
+        guard !order.isEmpty else {
+            return commands.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        let byID = Dictionary(uniqueKeysWithValues: commands.map { ($0.id, $0) })
+        var result: [CommandItem] = []
+        var seen = Set<UUID>()
+        for id in order {
+            if let cmd = byID[id], !seen.contains(id) {
+                result.append(cmd)
+                seen.insert(id)
+            }
+        }
+        let remaining = commands
+            .filter { !seen.contains($0.id) }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        result.append(contentsOf: remaining)
+        return result
+    }
+
+    /// Run the command matching `key` in the preferred terminal.
+    private func runInTerminal(key: String) {
+        let map = shortcutKeyMap()
+        guard let cmd = map[key.lowercased()] else { return }
+
+        let resolvedName = TerminalService.resolvedTerminalName(
+            preferred: settings.preferredTerminal,
+            previousApp: PreviousAppTracker.shared.previousApp
+        )
+        lastUsedTerminalName = resolvedName
+        withAnimation { showRanInTerminalAlert = true }
+
+        TerminalService.run(
+            cmd.command,
+            preferred: settings.preferredTerminal,
+            previousApp: PreviousAppTracker.shared.previousApp
+        )
+
+        // Dismiss popover after a brief flash of the toast
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            showRanInTerminalAlert = false
+            NotificationCenter.default.post(name: .cmdRackDismissPopover, object: nil)
         }
     }
 }

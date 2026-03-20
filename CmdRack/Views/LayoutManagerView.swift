@@ -216,6 +216,7 @@ private struct LayoutEditorSheet: View {
     @State private var allCommands: [CommandItem] = []
     @State private var showAddSection = false
     @State private var showDeleteConfirmation = false
+    @State private var showShortcutKeysSheet = false
 
     // Available filter values from existing commands
     private var availableTags: [String] {
@@ -307,40 +308,22 @@ private struct LayoutEditorSheet: View {
 
                     Divider()
 
-                    // Shortcut keys summary
-                    VStack(alignment: .leading, spacing: 4) {
+                    // Shortcut keys
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Shortcut Keys")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
 
-                        let totalCommands = countTotalCommands()
-                        let keyCount = layout.shortcutKeys.count
-
-                        Text("Shortcuts are assigned sequentially across sections. First command gets \"\(layout.shortcutKeys.first ?? "1")\", and so on.")
+                        Text("Assigned sequentially across sections. Tap to customize.")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
 
-                        HStack(spacing: 4) {
-                            Text("\(keyCount) keys configured")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("·")
-                                .foregroundStyle(.tertiary)
-                            Text("\(totalCommands) commands matched")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button {
+                            showShortcutKeysSheet = true
+                        } label: {
+                            shortcutKeysSummaryRow
                         }
-
-                        if totalCommands > keyCount {
-                            HStack(spacing: 4) {
-                                Image(systemName: "info.circle")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                                Text("\(totalCommands - keyCount) command\(totalCommands - keyCount == 1 ? "" : "s") will show without shortcuts.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                            }
-                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(20)
@@ -396,7 +379,50 @@ private struct LayoutEditorSheet: View {
                 onCancel: { showAddSection = false }
             )
         }
+        .sheet(isPresented: $showShortcutKeysSheet) {
+            LayoutShortcutKeysSheet(
+                keys: $layout.shortcutKeys,
+                settings: settings,
+                onDismiss: { showShortcutKeysSheet = false }
+            )
+        }
     }
+
+    // MARK: - Shortcut keys summary row
+
+    @ViewBuilder
+    private var shortcutKeysSummaryRow: some View {
+        let totalCommands = countTotalCommands()
+        let keyCount = layout.shortcutKeys.count
+        let preview = layout.shortcutKeys.prefix(10).joined()
+
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(keyCount) shortcut keys · \(totalCommands) commands matched")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                Text(preview + (keyCount > 10 ? "…" : ""))
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if totalCommands > keyCount {
+                Text("+\(totalCommands - keyCount) unassigned")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
+    }
+
+    // MARK: - Helpers
 
     private func loadCommands() {
         let repo = CommandRepository()
@@ -673,5 +699,127 @@ private struct AddSectionSheet: View {
                 customTitle = value
             }
         }
+    }
+}
+
+// MARK: - Layout shortcut keys editor
+
+private struct LayoutShortcutKeysSheet: View {
+    @Binding var keys: [String]
+    let settings: AppSettings
+    let onDismiss: () -> Void
+
+    @State private var conflictMessage: String?
+    @State private var dismissTask: DispatchWorkItem?
+
+    /// Groups of 10 for visual organisation.
+    private let rows = [
+        (label: "Row 1", range: 0..<10),
+        (label: "Row 2", range: 10..<20),
+        (label: "Row 3", range: 20..<30)
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Layout Shortcuts")
+                        .font(.headline)
+                    Text("Up to 30 keys, assigned sequentially across sections.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Reset to Default") {
+                    keys = LayoutConfiguration.defaultShortcutKeys
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button("Done") { onDismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+            .padding()
+
+            Divider()
+
+            if let msg = conflictMessage {
+                ShortcutConflictToast(message: msg) {
+                    clearConflict()
+                }
+            }
+
+            List {
+                ForEach(rows, id: \.label) { group in
+                    Section {
+                        ForEach(group.range, id: \.self) { i in
+                            shortcutRow(index: i)
+                        }
+                    } header: {
+                        Text(group.label)
+                    }
+                }
+            }
+            .listStyle(.inset(alternatesRowBackgrounds: true))
+        }
+        .frame(width: 340, height: 500)
+        .animation(.easeInOut(duration: 0.25), value: conflictMessage != nil)
+    }
+
+    @ViewBuilder
+    private func shortcutRow(index i: Int) -> some View {
+        HStack {
+            Text("Slot \(i + 1)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 50, alignment: .leading)
+            SingleKeyRecorderView(
+                key: Binding(
+                    get: { keys.indices.contains(i) ? keys[i] : "" },
+                    set: { newVal in
+                        var copy = keys
+                        while copy.count <= i { copy.append("") }
+                        copy[i] = newVal
+                        keys = copy
+                    }
+                ),
+                conflictCheck: { key in
+                    // Check duplicates within this layout's keys
+                    for (idx, existing) in keys.enumerated() where idx != i {
+                        if existing.lowercased() == key.lowercased() {
+                            return "\"\(key)\" is already used in slot \(idx + 1) of this layout."
+                        }
+                    }
+                    // Check reserved & search conflicts
+                    let k = key.lowercased()
+                    if AppSettings.reservedKeys.contains(k) {
+                        return "\"\(key)\" is reserved by the app."
+                    }
+                    if let idx = settings.searchResultShortcutKeys.firstIndex(where: { $0.lowercased() == k }) {
+                        return "\"\(key)\" is already used by Search result shortcuts (slot \(idx + 1))."
+                    }
+                    return nil
+                },
+                onConflict: { message in
+                    showConflict(message)
+                }
+            )
+        }
+    }
+
+    private func showConflict(_ message: String) {
+        dismissTask?.cancel()
+        withAnimation { conflictMessage = message }
+        let task = DispatchWorkItem { clearConflict() }
+        dismissTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5, execute: task)
+    }
+
+    private func clearConflict() {
+        dismissTask?.cancel()
+        withAnimation { conflictMessage = nil }
     }
 }

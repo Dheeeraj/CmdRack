@@ -230,7 +230,71 @@ struct SettingsView: View {
                     Text("How many commands to show when you open CmdRack from the menu bar (1–10 each). Tap \"Arrange pinned commands\" to open the Commands list on the Pinned tab and drag to reorder. Shortcuts default to 1–0 for pinned and q–p for recent. Search result shortcuts are always two single keys (no modifiers).")
                 }
 
-                // ── 4. Command limits ───────────────────────────────
+                // ── 4. Terminal ────────────────────────────────────
+                Section {
+                    let installed = PreferredTerminal.installed
+                    Picker("Preferred terminal", selection: $settings.preferredTerminal) {
+                        ForEach(installed, id: \.self) { terminal in
+                            Text(terminal.displayName).tag(terminal)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    if installed.count <= 1 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("Only Terminal.app detected. Install iTerm2, Ghostty, Warp, Kitty, or Alacritty and they'll appear here automatically.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Picker("Default shortcut action", selection: $settings.defaultShortcutAction) {
+                        ForEach(ShortcutAction.allCases, id: \.self) { action in
+                            Text(action.displayName).tag(action)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Picker("Modifier for alternate action", selection: $settings.terminalModifierKey) {
+                        ForEach(TerminalModifierKey.allCases, id: \.self) { key in
+                            Text("\(key.symbol) \(key.displayName)").tag(key)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    // Live preview of current config
+                    HStack(spacing: 0) {
+                        let mod = settings.terminalModifierKey.symbol
+                        if settings.defaultShortcutAction == .copy {
+                            Label {
+                                Text("Key → copy  ·  \(mod)+key → run in terminal")
+                                    .font(.caption2)
+                            } icon: {
+                                Image(systemName: "info.circle")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.secondary)
+                        } else {
+                            Label {
+                                Text("Key → run in terminal  ·  \(mod)+key → copy")
+                                    .font(.caption2)
+                            } icon: {
+                                Image(systemName: "info.circle")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Terminal")
+                } footer: {
+                    Text("Choose what happens when you press a shortcut key in the popup, and which modifier triggers the alternate action. If the previously active app is a supported terminal, it will be used automatically.")
+                }
+
+                // ── 5. Command limits ───────────────────────────────
                 Section {
                     HStack {
                         Text("Max text length")

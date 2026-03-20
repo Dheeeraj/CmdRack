@@ -48,6 +48,17 @@ struct CmdRackApp: App {
     }
 }
 
+/// Tracks the app that was active before the popover opened.
+/// Used by TerminalService for smart terminal detection.
+final class PreviousAppTracker {
+    static let shared = PreviousAppTracker()
+    private(set) var previousApp: NSRunningApplication?
+
+    func capture() {
+        previousApp = NSWorkspace.shared.frontmostApplication
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
@@ -105,6 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showPopover(_ sender: Any?) {
         guard let button = statusItem.button else { return }
+
+        // Capture the frontmost app before we steal focus.
+        PreviousAppTracker.shared.capture()
 
         // Bring the app to foreground before showing the popover.
         NSApp.activate(ignoringOtherApps: true)
