@@ -113,9 +113,23 @@ jobs:
           chmod +x "$SIGN_UPDATE"
 
           # Sign the zip using stdin pipe as recommended by Sparkle docs
-          # -p flag outputs just the raw signature, -f - reads key from stdin
+          # -f - reads key from stdin, -p outputs just the raw signature
           echo "Running sign_update..."
-          SIGNATURE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" -p "$ZIP_PATH" -f -)
+          echo "Key length: ${#SPARKLE_PRIVATE_KEY} chars"
+
+          SIGN_OUTPUT=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - -p "$ZIP_PATH" 2>&1) || true
+          echo "sign_update output: $SIGN_OUTPUT"
+
+          # With -p flag, output is just the raw signature
+          SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -v '^Error' | grep -v '^Warning' | grep -E '^[A-Za-z0-9+/=]{40,}$' | head -1 || true)
+
+          # If -p didn't work, try without -p and parse the XML attribute
+          if [ -z "$SIGNATURE" ]; then
+            echo "Retrying without -p flag..."
+            SIGN_OUTPUT2=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - "$ZIP_PATH" 2>&1) || true
+            echo "sign_update output (no -p): $SIGN_OUTPUT2"
+            SIGNATURE=$(echo "$SIGN_OUTPUT2" | grep -oE 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//' || true)
+          fi
 
           LENGTH=$(stat -f%z "$ZIP_PATH")
 
